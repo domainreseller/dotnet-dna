@@ -83,14 +83,16 @@ namespace DomainNameApi
 
                 if (apply)
                 {
-                    ApplyResourceRecords(domainName);
+                    // A failed apply leaves the change staged but not live: report the apply error.
+                    var applied = ApplyResourceRecords(domainName);
+                    if (Php.ToStr(Php.Get(applied, "result")) != ResultOk) return applied;
                 }
 
                 return Ok(new JsonObject
                 {
                     ["Name"] = name,
-                    ["Type"] = type,
-                    ["TTL"] = Php.Int(ttl),
+                    ["Type"] = Php.Clone(body["zoneStruct"]["type"]),
+                    ["TTL"] = Php.Clone(body["zoneStruct"]["ttl"]),
                     ["Content"] = Php.Clone(contentNode),
                 });
             }
@@ -119,14 +121,16 @@ namespace DomainNameApi
 
                 if (apply)
                 {
-                    ApplyResourceRecords(domainName);
+                    // A failed apply leaves the change staged but not live: report the apply error.
+                    var applied = ApplyResourceRecords(domainName);
+                    if (Php.ToStr(Php.Get(applied, "result")) != ResultOk) return applied;
                 }
 
                 return Ok(new JsonObject
                 {
                     ["Name"] = name,
-                    ["Type"] = type,
-                    ["TTL"] = Php.Int(ttl),
+                    ["Type"] = Php.Clone(body["zoneStruct"]["type"]),
+                    ["TTL"] = Php.Clone(body["zoneStruct"]["ttl"]),
                     ["Content"] = Php.Clone(contentNode),
                 });
             }
@@ -154,7 +158,9 @@ namespace DomainNameApi
 
                 if (apply)
                 {
-                    ApplyResourceRecords(domainName);
+                    // A failed apply leaves the change staged but not live: report the apply error.
+                    var applied = ApplyResourceRecords(domainName);
+                    if (Php.ToStr(Php.Get(applied, "result")) != ResultOk) return applied;
                 }
 
                 return Ok(new JsonObject { ["Name"] = name, ["Type"] = recordType, ["Content"] = record });
@@ -207,14 +213,16 @@ namespace DomainNameApi
 
                 if (apply)
                 {
-                    ApplyResourceRecords(domainName);
+                    // A failed apply leaves the change staged but not live: report the apply error.
+                    var applied = ApplyResourceRecords(domainName);
+                    if (Php.ToStr(Php.Get(applied, "result")) != ResultOk) return applied;
                 }
 
                 return Ok(new JsonObject
                 {
                     ["Name"] = name,
-                    ["Type"] = Php.Upper(type ?? ""),
-                    ["TTL"] = Php.Int(ttl),
+                    ["Type"] = Php.Clone(body["zoneStruct"]["type"]),
+                    ["TTL"] = Php.Clone(body["zoneStruct"]["ttl"]),
                     ["Contents"] = new JsonArray(values.Select(Php.Str).ToArray()),
                 });
             }
@@ -567,8 +575,8 @@ namespace DomainNameApi
             catch (Exception e)
             {
                 var raw = Php.Coalesce(Php.Get(_lastResponse, "raw_response"), Php.Str(e.Message));
-                if (Php.ToStr(raw).IndexOf("not found", StringComparison.OrdinalIgnoreCase) >= 0
-                    || e.Message.IndexOf("not found", StringComparison.OrdinalIgnoreCase) >= 0)
+                // Only the gateway's "no forwarding configured" answer means disabled.
+                if (IsForwardNotSet(e))
                 {
                     return Ok(new JsonObject { ["Enabled"] = false, ["RedirectAddress"] = "", ["ForwardType"] = "" });
                 }
@@ -620,12 +628,26 @@ namespace DomainNameApi
             try
             {
                 Request("DELETE", "domains/forwards", new JsonObject { ["DomainName"] = domainName });
-                return Ok(new JsonObject { ["DomainName"] = domainName });
+                return Ok(new JsonObject { ["DomainName"] = domainName, ["Removed"] = true });
             }
             catch (Exception e)
             {
+                // Nothing configured: deleting is a no-op.
+                if (IsForwardNotSet(e))
+                {
+                    return Ok(new JsonObject { ["DomainName"] = domainName, ["Removed"] = false });
+                }
                 return ErrorEnvelope(e, "DELETE_FORWARD");
             }
+        }
+
+        /// <summary>The gateway answers "Redirect information not found" when no forwarding is configured.</summary>
+        private bool IsForwardNotSet(Exception e)
+        {
+            const string needle = "redirect information not found";
+            return e.Message.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0
+                || Php.ToStr(Php.Get(_lastResponse, "raw_response")).IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0
+                || Php.JsonEncode(_lastResponse).IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }

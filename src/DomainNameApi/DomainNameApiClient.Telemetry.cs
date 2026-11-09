@@ -40,6 +40,7 @@ namespace DomainNameApi
             "Invalid API credentials",
             "could not be found",
             "Insufficent reseller balance",
+            "Redirect information not found",
         };
 
         private bool _errorReportingEnabled = true;

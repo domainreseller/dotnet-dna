@@ -7,7 +7,8 @@ namespace DomainNameApi.Examples
     {
         public static JsonNode Run(DomainNameApiClient dna)
         {
-            var result = dna.ModifyPrivacyProtectionStatus("example.com", true, "Owner request");
+            // The flag may also be text ("1", "true", "on", "yes"); the reason argument is not sent.
+            var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
 
             /*
              * { "data": { "PrivacyProtectionStatus": true }, "result": "OK" }

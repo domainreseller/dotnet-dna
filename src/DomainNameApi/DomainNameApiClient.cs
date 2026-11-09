@@ -89,6 +89,8 @@ namespace DomainNameApi
         private string _lastFunction = "";
         private DateTime _startAt = DateTime.UtcNow;
         private DateTime _lastZoneRequestAt = DateTime.MinValue;
+        private bool _transportFailed;
+        private string _lastGatewayCode = "";
 
         /// <summary>
         /// Create a client.
@@ -225,31 +227,43 @@ namespace DomainNameApi
             };
 
         /// <summary>php-dna setError(): {Code, Message, Details}.</summary>
-        private static JsonObject SetError(string code, JsonNode message = null, JsonNode details = null)
+        private JsonObject SetError(string code, JsonNode message = null, JsonNode details = null)
         {
             message = message ?? Php.Str("");
             details = details ?? Php.Str("");
+            JsonObject result;
             if (DefaultErrors.TryGetValue(code, out var def))
             {
-                return new JsonObject
+                result = new JsonObject
                 {
                     ["Code"] = code,
                     ["Message"] = Php.Trim(Php.ToStr(message)) != "" ? Php.Clone(message) : Php.Str(def.Message),
                     ["Details"] = Php.Trim(Php.ToStr(details)) != "" ? Php.Clone(details) : Php.Str(def.Description),
                 };
             }
-            return new JsonObject
+            else
             {
-                ["Code"] = code,
-                ["Message"] = Php.Clone(message),
-                ["Details"] = Php.Clone(details),
-            };
+                result = new JsonObject
+                {
+                    ["Code"] = code,
+                    ["Message"] = Php.Clone(message),
+                    ["Details"] = Php.Clone(details),
+                };
+            }
+            // Keep the gateway's own error code next to the API_<status> code.
+            if (ApiStatusCode.IsMatch(code ?? "") && _lastGatewayCode != "")
+            {
+                result["GatewayCode"] = _lastGatewayCode;
+            }
+            return result;
         }
 
-        private static JsonObject SetError(string code, string message, string details) => SetError(code, Php.Str(message), Php.Str(details));
+        private JsonObject SetError(string code, string message, string details) => SetError(code, Php.Str(message), Php.Str(details));
 
-        /// <summary>formatErrorCode(): numeric codes become API_&lt;code&gt;.</summary>
-        private static string FormatErrorCode(long code) => "API_" + code.ToString(CultureInfo.InvariantCulture);
+        private static readonly Regex ApiStatusCode = new Regex(@"^API_[0-9]+$", RegexOptions.CultureInvariant);
+
+        /// <summary>formatErrorCode(): HTTP statuses become API_&lt;status&gt;, transport failures CURL_&lt;errno&gt;.</summary>
+        private string FormatErrorCode(long code) => (_transportFailed ? "CURL_" : "API_") + code.ToString(CultureInfo.InvariantCulture);
 
         /// <summary>The catch block shared by every public method.</summary>
         private JsonObject ErrorEnvelope(Exception e, string fallbackCode)
@@ -317,6 +331,9 @@ namespace DomainNameApi
             data = data ?? new JsonArray();
             PaceZoneRequest(endpoint);
 
+            _transportFailed = false;
+            _lastGatewayCode = "";
+
             _startAt = DateTime.UtcNow;
             var stopwatch = Stopwatch.StartNew();
 
@@ -371,6 +388,7 @@ namespace DomainNameApi
                 // Transport failure: never an empty success.
                 _lastResponseHeaders = new JsonObject { ["url"] = url, ["http_code"] = 0, ["content_type"] = null, ["total_time"] = stopwatch.Elapsed.TotalSeconds };
                 _lastResponse = new JsonObject { ["raw_response"] = false };
+                _transportFailed = true;
                 var errorMessage = "Curl error during request: " + te.Message;
                 if (te.ErrorNumber == 28)
                 {
@@ -425,7 +443,16 @@ namespace DomainNameApi
 
             var messageNode = Php.Coalesce(Php.Get(parsed, "message"), Php.Get(parsed, "error", "message"), Php.Str(responseBody));
             var codeNode = Php.Coalesce(Php.Get(parsed, "code"), Php.Get(parsed, "error", "code"), Php.Str("HTTP_" + status.ToString(CultureInfo.InvariantCulture)));
-            var detailsNode = Php.Coalesce(Php.Get(parsed, "details"), Php.Get(parsed, "error", "details"), Php.Str(responseBody));
+            var apiDetails = Php.Coalesce(Php.Get(parsed, "details"), Php.Get(parsed, "error", "details"));
+            var detailsNode = Php.Coalesce(apiDetails, Php.Str(responseBody));
+            if (Php.IsString(codeNode))
+            {
+                var gw = codeNode.GetValue<string>();
+                if (gw != "" && !gw.StartsWith("HTTP_", StringComparison.Ordinal) && gw != "CREDENTIALS")
+                {
+                    _lastGatewayCode = gw;
+                }
+            }
 
             var message = Php.ToStr(messageNode);
             var codeText = Php.ToStr(codeNode);
@@ -441,7 +468,8 @@ namespace DomainNameApi
             // ABP boilerplate or the bare error code echoed back (BUG-10124).
             if (Boilerplate.IsMatch(message) || message == codeText)
             {
-                var detailsClean = Php.Trim(Regex.Replace(Php.ToStr(detailsNode), @"^Dna[ \t\n\r\v\f]+", ""));
+                // Only the gateway's details field may replace the message, never the raw body.
+                var detailsClean = Php.Trim(Regex.Replace(Php.ToStr(apiDetails), @"^Dna[ \t\n\r\v\f]+", ""));
                 if (detailsClean != "" && detailsClean != message && detailsClean != codeText && !Boilerplate.IsMatch(detailsClean))
                 {
                     message = detailsClean;

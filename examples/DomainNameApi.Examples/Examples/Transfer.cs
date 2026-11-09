@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 
 namespace DomainNameApi.Examples
 {
-    /// <summary>Start an incoming transfer with the EPP/auth code.</summary>
+    /// <summary>Start an incoming transfer with the EPP/auth code (contacts are never sent; the registrar takes them over).</summary>
     internal static class Transfer
     {
         public static JsonNode Run(DomainNameApiClient dna)

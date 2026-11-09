@@ -10,7 +10,7 @@ namespace DomainNameApi.Examples
             var result = dna.DeleteForwarding("example.com");
 
             /*
-             * { "result": "OK", "data": { "DomainName": "example.com" } }
+             * { "result": "OK", "data": { "DomainName": "example.com", "Removed": true } }
              */
             return result;
         }

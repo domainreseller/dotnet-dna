@@ -21,22 +21,29 @@ namespace DomainNameApi
             {
                 var domainInfo = Request("GET", "domains/info", new JsonObject { ["DomainName"] = domainName });
 
+                // Matched case-insensitively, with the long and short spellings.
                 var typeMap = new Dictionary<string, string>
                 {
-                    ["Admin"] = "Administrative",
-                    ["Billing"] = "Billing",
-                    ["Tech"] = "Technical",
-                    ["Registrant"] = "Registrant",
+                    ["admin"] = "Administrative",
+                    ["administrative"] = "Administrative",
+                    ["billing"] = "Billing",
+                    ["tech"] = "Technical",
+                    ["technical"] = "Technical",
+                    ["registrant"] = "Registrant",
+                    ["owner"] = "Registrant",
                 };
 
-                var contacts = new Dictionary<string, JsonNode>();
+                // Insertion-ordered like a PHP array.
+                var contacts = new JsonObject();
                 var list = Php.Get(domainInfo, "contacts");
                 if (list != null && Php.IsArray(list))
                 {
                     foreach (var item in Php.Values(list))
                     {
-                        var apiType = Php.ToStr(Php.Coalesce(Php.Get(item, "contactType"), Php.Str("")));
-                        var key = typeMap.TryGetValue(apiType, out var k) ? k : Php.UcFirst(Php.Lower(apiType));
+                        if (!Php.IsArray(item)) continue;
+                        var apiType = Php.Trim(Php.ToStr(Php.Coalesce(Php.Get(item, "contactType"), Php.Str(""))));
+                        var key = typeMap.TryGetValue(Php.Lower(apiType), out var k) ? k : Php.UcFirst(Php.Lower(apiType));
+                        if (key == "") continue;
                         var merged = ToMap(Php.Clone(item) ?? new JsonObject());
                         if (!(merged is JsonObject mergedObj))
                         {
@@ -47,13 +54,19 @@ namespace DomainNameApi
                     }
                 }
 
+                // Administrative, Billing, Registrant, Technical, then any other type (kept, not dropped).
                 var ordered = new JsonObject();
                 foreach (var key in new[] { "Administrative", "Billing", "Registrant", "Technical" })
                 {
-                    if (contacts.TryGetValue(key, out var c) && c != null)
+                    if (contacts.TryGetPropertyValue(key, out var c) && c != null)
                     {
-                        ordered[key] = c;
+                        ordered[key] = c.DeepClone();
+                        contacts.Remove(key);
                     }
+                }
+                foreach (var kv in contacts.ToList())
+                {
+                    ordered[kv.Key] = Php.Clone(kv.Value);
                 }
 
                 return new JsonObject
@@ -257,7 +270,6 @@ namespace DomainNameApi
             ("LastName", "Isimyok"),
             ("AddressLine1", "Addres yok"),
             ("City", "ISTANBUL"),
-            ("State", "ISTANBUL"),
             ("Country", "TR"),
             ("ZipCode", "34000"),
             ("Phone", "5555555555"),
@@ -275,6 +287,11 @@ namespace DomainNameApi
                 {
                     contact[key] = value;
                 }
+            }
+            // No State default: a missing state falls back to the city below.
+            if (Php.Get(contact, "State") == null)
+            {
+                contact["State"] = "";
             }
 
             contact["FirstName"] = SanitizePersonName(Php.ToStr(contact["FirstName"]));
@@ -358,6 +375,16 @@ namespace DomainNameApi
                 {
                     digits = digits.Substring(cc.Length);
                 }
+                else
+                {
+                    // The number carries its own country code and it differs from the given one: the number wins.
+                    var own = CallingCodePrefix(digits);
+                    if (own != "" && digits.Length > own.Length)
+                    {
+                        cc = own;
+                        digits = digits.Substring(own.Length);
+                    }
+                }
             }
             else if (cc != "" && digits.StartsWith(cc, StringComparison.Ordinal) && digits.Length > 10)
             {
@@ -383,6 +410,23 @@ namespace DomainNameApi
             }
 
             return (digits, cc);
+        }
+
+        private static readonly HashSet<string> TwoDigitCallingCodes = new HashSet<string>
+        {
+            "20", "27", "30", "31", "32", "33", "34", "36", "39", "40", "41", "43", "44", "45", "46", "47",
+            "48", "49", "51", "52", "53", "54", "55", "56", "57", "58", "60", "61", "62", "63", "64", "65",
+            "66", "81", "82", "84", "86", "90", "91", "92", "93", "94", "95", "98",
+        };
+
+        /// <summary>Country calling code at the start of an international number (digits only, without "+").</summary>
+        internal static string CallingCodePrefix(string digits)
+        {
+            digits = digits ?? "";
+            if (digits == "" || digits[0] == '0') return "";
+            if (digits[0] == '1' || digits[0] == '7') return digits.Substring(0, 1);
+            if (digits.Length >= 2 && TwoDigitCallingCodes.Contains(digits.Substring(0, 2))) return digits.Substring(0, 2);
+            return digits.Length >= 3 ? digits.Substring(0, 3) : "";
         }
 
         // ------------------------------------------------------------------

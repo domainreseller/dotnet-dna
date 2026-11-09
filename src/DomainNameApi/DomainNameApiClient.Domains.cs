@@ -26,20 +26,20 @@ namespace DomainNameApi
                     resp["id"] = Php.Clone(Php.Get(response, "resellerId"));
                     resp["active"] = true;
                     resp["name"] = Php.Clone(Php.Coalesce(Php.Get(response, "resellerName"), Php.Str("")));
-                    resp["balance"] = Php.ToStr(Php.Coalesce(Php.Get(response, "usdBalance"), Php.Int(0)));
+                    resp["balance"] = Php.NumberFormat(Php.ToFloat(Php.Coalesce(Php.Get(response, "usdBalance"), Php.Int(0))), 2);
                     resp["currency"] = "USD";
                     resp["symbol"] = "$";
                     resp["balances"] = new JsonArray
                     {
                         new JsonObject
                         {
-                            ["balance"] = Php.ToStr(Php.Coalesce(Php.Get(response, "usdBalance"), Php.Int(0))),
+                            ["balance"] = Php.NumberFormat(Php.ToFloat(Php.Coalesce(Php.Get(response, "usdBalance"), Php.Int(0))), 2),
                             ["currency"] = "USD",
                             ["symbol"] = "$",
                         },
                         new JsonObject
                         {
-                            ["balance"] = Php.ToStr(Php.Coalesce(Php.Get(response, "tryBalance"), Php.Int(0))),
+                            ["balance"] = Php.NumberFormat(Php.ToFloat(Php.Coalesce(Php.Get(response, "tryBalance"), Php.Int(0))), 2),
                             ["currency"] = "TL",
                             ["symbol"] = "TL",
                         },
@@ -78,6 +78,21 @@ namespace DomainNameApi
             {
                 var response = Request("GET", "deposit/accounts/me", new JsonObject { ["currency"] = currencyName });
                 var balanceKey = Php.Lower(currencyId) + "Balance";
+                if (!Php.IsArray(response) || !HasKey(response, balanceKey))
+                {
+                    // The account only reports USD and TRY balances.
+                    return new JsonObject
+                    {
+                        ["ErrorCode"] = "BALANCE",
+                        ["OperationMessage"] = "No " + currencyName + " balance is reported for this account. Available: USD, TRY.",
+                        ["OperationResult"] = "FAILED",
+                        ["Balance"] = "0.00",
+                        ["CurrencyId"] = Php.Int(id),
+                        ["CurrencyInfo"] = null,
+                        ["CurrencyName"] = name,
+                        ["CurrencySymbol"] = symbol,
+                    };
+                }
                 return new JsonObject
                 {
                     ["ErrorCode"] = Php.Int(0),
@@ -160,7 +175,12 @@ namespace DomainNameApi
                             tld = Php.Lower(dot >= 0 ? dn.Substring(dot + 1) : "");
                         }
                         var domainRaw = Php.ToStr(Php.Coalesce(Php.Get(item, "domainName"), Php.Str("")));
-                        var domainName = Php.Lower(domainRaw).Replace("." + tld, "");
+                        // Strip only the trailing ".tld".
+                        var lower = Php.Lower(domainRaw);
+                        var suffix = "." + tld;
+                        var domainName = tld != "" && lower.EndsWith(suffix, StringComparison.Ordinal)
+                            ? lower.Substring(0, lower.Length - suffix.Length)
+                            : lower;
                         var status = Php.Lower(Php.ToStr(Php.Coalesce(Php.Get(item, "status"), Php.Str(""))));
                         var isAvailable = status == "available" || status == "true"
                                           || (Php.IsNumericString(status) && Php.StringToFloat(status) == 1.0);
@@ -417,7 +437,8 @@ namespace DomainNameApi
                     ["result"] = ResultOk,
                     ["data"] = new JsonObject
                     {
-                        ["NameServers"] = Php.Clone(Php.Coalesce(Php.Get(response, "nameServers"), input)),
+                        // Report the normalised list that was sent, not the raw input.
+                        ["NameServers"] = Php.Clone(Php.Coalesce(Php.Get(response, "nameServers"), payload["nameServers"])),
                     },
                 };
             }
@@ -531,15 +552,13 @@ namespace DomainNameApi
         // ------------------------------------------------------------------
 
         /// <summary>
-        /// Start an incoming transfer.
+        /// Start an incoming transfer with the domain's EPP/auth code.
         /// </summary>
         /// <remarks>
-        /// <paramref name="contacts"/> is accepted for signature parity with php-dna's
-        /// DNARest::transfer() but, exactly like php-dna's public facade
-        /// (DomainNameAPI_PHPLibrary::transfer() does not forward it), it is not sent:
-        /// the request always carries an empty contact list.
+        /// Contacts are never sent with a transfer (the request always carries an
+        /// empty contact list): the registrar takes them over from the losing registrar.
         /// </remarks>
-        public JsonNode Transfer(string domainName, string eppCode, int period, IDictionary<string, object> contacts = null)
+        public JsonNode Transfer(string domainName, string eppCode, int period)
         {
             try
             {
@@ -551,6 +570,8 @@ namespace DomainNameApi
                     ["contacts"] = new JsonArray(),
                 };
                 var response = Request("POST", "domains/transfer", payload);
+                var failed = OperationFailure(response, "TRANSFER_DOMAIN");
+                if (failed != null) return failed;
                 return ParseDomainInfo(response);
             }
             catch (Exception e)
@@ -636,6 +657,8 @@ namespace DomainNameApi
             try
             {
                 var response = Request("POST", "domains/renew", new JsonObject { ["domainName"] = domainName, ["period"] = Php.Int(period) });
+                var failed = OperationFailure(response, "RENEW_DOMAIN");
+                if (failed != null) return failed;
                 if (!Php.Empty(Php.Get(response, "expirationDate")))
                 {
                     return Ok(new JsonObject { ["ExpirationDate"] = FormatApiDate(Php.Get(response, "expirationDate")) });
@@ -697,6 +720,8 @@ namespace DomainNameApi
                 };
 
                 var response = Request("POST", "domains/register-with-contacts", payload);
+                var failed = OperationFailure(response, "REGISTER_DOMAIN");
+                if (failed != null) return failed;
                 return ParseDomainInfo(response);
             }
             catch (Exception e)
@@ -706,18 +731,27 @@ namespace DomainNameApi
         }
 
         /// <summary>Turn WHOIS privacy protection on or off.</summary>
+        /// <param name="domainName">Domain.</param>
+        /// <param name="status">Enable or disable privacy.</param>
+        /// <param name="reason">Kept for signature compatibility only; the gateway has no reason field and it is not sent.</param>
         public JsonNode ModifyPrivacyProtectionStatus(string domainName, bool status, string reason = DefaultReason)
+            => ModifyPrivacy(domainName, status);
+
+        /// <summary>
+        /// Turn WHOIS privacy protection on or off with the flag given as text, as
+        /// panels store it: "1", "true", "on" and "yes" (any case) enable it.
+        /// </summary>
+        public JsonNode ModifyPrivacyProtectionStatus(string domainName, string status, string reason = DefaultReason)
+            => ModifyPrivacy(domainName, ParseBool(status));
+
+        private JsonNode ModifyPrivacy(string domainName, bool enabled)
         {
             try
             {
-                if (string.IsNullOrEmpty(reason) || reason == "0")
-                {
-                    reason = DefaultReason; // kept for parity; the gateway takes no reason
-                }
-                Request("POST", "domains/privacy", new JsonObject { ["domainName"] = domainName, ["privacyStatus"] = status });
+                Request("POST", "domains/privacy", new JsonObject { ["domainName"] = domainName, ["privacyStatus"] = enabled });
                 return new JsonObject
                 {
-                    ["data"] = new JsonObject { ["PrivacyProtectionStatus"] = status },
+                    ["data"] = new JsonObject { ["PrivacyProtectionStatus"] = enabled },
                     ["result"] = ResultOk,
                 };
             }
@@ -725,6 +759,32 @@ namespace DomainNameApi
             {
                 return ErrorEnvelope(e, "MODIFY_PRIVACY");
             }
+        }
+
+        /// <summary>
+        /// register/transfer/renew can answer HTTP 200 with {"success": false}: that is a
+        /// refusal, returned as an error envelope. Null when the operation succeeded.
+        /// </summary>
+        private JsonObject OperationFailure(JsonNode response, string code)
+        {
+            if (!(response is JsonObject o) || !o.TryGetPropertyValue("success", out var success)
+                || !Php.IsBool(success) || success.GetValue<bool>())
+            {
+                return null;
+            }
+            var message = Php.Trim(Php.ToStr(Php.Coalesce(Php.Get(response, "message"), Php.Str(""))));
+            if (message == "")
+            {
+                message = "The registry did not accept the request.";
+            }
+            return new JsonObject { ["result"] = ResultError, ["error"] = SetError(code, message, message) };
+        }
+
+        private static bool HasKey(JsonNode n, string key)
+        {
+            if (n is JsonObject o) return o.ContainsKey(key);
+            if (n is JsonArray a) return int.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var i) && i < a.Count && i.ToString(CultureInfo.InvariantCulture) == key;
+            return false;
         }
 
         // ------------------------------------------------------------------
