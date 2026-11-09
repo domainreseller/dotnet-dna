@@ -14,7 +14,7 @@
 
 Le client .NET officiel de l'API REST revendeur de DomainNameAPI : recherche de domaines, enregistrement, renouvellement, transferts, contacts, serveurs de noms, serveurs de noms enfants, zones DNS et redirection d'URL.
 
-dotnet-dna est un portage fidèle de [php-dna](https://github.com/domainreseller/php-dna) : les mêmes méthodes, les mêmes requêtes sur le réseau et les mêmes valeurs de retour. Il est vérifié à l'aide des fixtures de conformité de php-dna (126 scénarios), de sorte que le code écrit pour la bibliothèque PHP se transpose à l'identique.
+dotnet-dna est un portage fidèle de [php-dna](https://github.com/domainreseller/php-dna) : les mêmes méthodes, les mêmes requêtes sur le réseau et les mêmes valeurs de retour. Il est vérifié à l'aide des fixtures de conformité de php-dna (134 scénarios), de sorte que le code écrit pour la bibliothèque PHP se transpose à l'identique.
 
 ## 📦 Téléchargement — utilisez toujours les Releases !
 
@@ -170,7 +170,7 @@ var result = dna.RegisterWithContactInfo(
     });
 ```
 
-Les contacts sont complétés avant l'envoi : les champs manquants reçoivent des valeurs par défaut, les chiffres et la ponctuation sont retirés des noms, un État vide est remplacé par la ville, les noms de pays sont convertis en codes ISO et les numéros de téléphone sont séparés en numéro et indicatif pays (voir `ValidateContact`). Si aucun serveur de noms n'est fourni (ou seulement des valeurs vides), `ns1.domainnameapi.com` et `ns2.domainnameapi.com` sont utilisés. Pour les domaines .tr, les attributs TRABIS sont réduits à ceux que la passerelle accepte (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`) ; l'ancienne clé `TRABISCITIZIENID` et la catégorie numérique sont converties automatiquement.
+Les contacts sont complétés avant l'envoi : les champs manquants reçoivent des valeurs par défaut, les chiffres et la ponctuation sont retirés des noms, un État absent ou vide est remplacé par la ville, les noms de pays sont convertis en codes ISO et les numéros de téléphone sont séparés en numéro et indicatif pays — un numéro écrit avec son propre indicatif `+` ou `00` conserve cet indicatif (voir `ValidateContact`). Si aucun serveur de noms n'est fourni (ou seulement des valeurs vides), `ns1.domainnameapi.com` et `ns2.domainnameapi.com` sont utilisés. Pour les domaines .tr, les attributs TRABIS sont réduits à ceux que la passerelle accepte (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`) ; l'ancienne clé `TRABISCITIZIENID` et la catégorie numérique sont converties automatiquement.
 
 <details>
 <summary>Exemple de Sortie pour l'Enregistrement de Domaine</summary>
@@ -202,6 +202,8 @@ Les contacts sont complétés avant l'envoi : les champs manquants reçoivent de
 
 </details>
 
+Si la passerelle refuse la commande (elle répond `"success": false`), la méthode renvoie une enveloppe d'erreur avec `Code` = `REGISTER_DOMAIN` et le message de la passerelle, de sorte qu'un enregistrement refusé n'est jamais signalé comme effectué. `Renew` (`RENEW_DOMAIN`) et `Transfer` (`TRANSFER_DOMAIN`) se comportent de la même manière.
+
 <hr style="border: 4px solid #000; border-style: dashed;">
 
 #### Renouvellement de Domaine
@@ -227,7 +229,7 @@ var result = dna.Renew("example.com", 1);
 var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
 ```
 
-> ℹ️ Comme la façade publique de php-dna, `Transfer` envoie une liste de contacts vide ; le paramètre optionnel `contacts` n'existe que pour conserver la même signature.
+> ℹ️ Un transfert n'envoie jamais de contacts : la requête contient toujours une liste de contacts vide et le registraire reprend lui-même les contacts. `Transfer` n'a donc pas de paramètre de contacts ; si nécessaire, mettez à jour les contacts avec `SaveContacts` une fois le transfert terminé.
 
 <details>
 <summary>Exemple de Sortie pour le Transfert de Domaine</summary>
@@ -558,8 +560,13 @@ var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.
 #### Modifier la Protection de la Vie Privée
 
 ```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true, "Owner request");
+var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
+
+// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
+var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
 ```
+
+Le troisième argument optionnel (`reason`) n'est conservé que pour la compatibilité ; la passerelle ne possède pas ce champ et il n'est pas envoyé.
 
 <details>
 <summary>Exemple de Sortie pour Modifier la Protection de la Vie Privée</summary>
@@ -677,12 +684,12 @@ var result = dna.GetResellerDetails();
   "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "active": true,
   "name": "Example Reseller",
-  "balance": "500",
+  "balance": "500.00",
   "currency": "USD",
   "symbol": "$",
   "balances": [
-    { "balance": "500", "currency": "USD", "symbol": "$" },
-    { "balance": "1500", "currency": "TL", "symbol": "TL" }
+    { "balance": "500.00", "currency": "USD", "symbol": "$" },
+    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
   ]
 }
 ```
@@ -713,7 +720,7 @@ var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
 }
 ```
 
-En cas d'échec, `OperationResult` vaut `FAILED`, `ErrorCode` contient le code d'erreur (par exemple `API_429`) et `Balance` vaut `"0.00"`.
+En cas d'échec, `OperationResult` vaut `FAILED`, `ErrorCode` contient le code d'erreur (par exemple `API_429`) et `Balance` vaut `"0.00"`. Le compte ne communique que les soldes en USD et en TRY ; demander une autre devise (EUR, GBP, ...) échoue avec `ErrorCode` = `BALANCE` et le message `No EUR balance is reported for this account. Available: USD, TRY.`
 
 </details>
 
@@ -721,7 +728,7 @@ En cas d'échec, `OperationResult` vaut `FAILED`, `ErrorCode` contient le code d
 
 #### Gestion de la Zone DNS
 
-La passerelle stocke une zone sous forme d'**ensembles** d'enregistrements (nom + type → valeurs) et remplace un ensemble entier à chaque écriture. Les méthodes `*ResourceRecordSet` et `*ResourceRecordValue` s'en chargent pour vous. Les noms peuvent être relatifs (`www`), désigner l'apex (`@`, `""` ou `example.com`) ou être pleinement qualifiés (`www.example.com.`). Types pris en charge : `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. Les écritures sont validées immédiatement, sauf si vous passez `apply: false` et appelez vous-même `ApplyResourceRecords`. Les appels de zone consécutifs sont espacés d'au moins une seconde, car la passerelle répond aux rafales de requêtes par un HTTP 429.
+La passerelle stocke une zone sous forme d'**ensembles** d'enregistrements (nom + type → valeurs) et remplace un ensemble entier à chaque écriture. Les méthodes `*ResourceRecordSet` et `*ResourceRecordValue` s'en chargent pour vous. Les noms peuvent être relatifs (`www`), désigner l'apex (`@`, `""` ou `example.com`) ou être pleinement qualifiés (`www.example.com.`). Types pris en charge : `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. Les écritures sont validées immédiatement, sauf si vous passez `apply: false` et appelez vous-même `ApplyResourceRecords` ; si cette application automatique échoue, la méthode renvoie l'erreur d'application (la modification reste en attente et n'est pas mise en ligne). Les appels de zone consécutifs sont espacés d'au moins une seconde, car la passerelle répond aux rafales de requêtes par un HTTP 429.
 
 ```csharp
 // List every record (one row per value; names are fully qualified)
@@ -767,7 +774,7 @@ dna.ApplyResourceRecords("example.com");
 }
 ```
 
-`SetResourceRecordSet` / `AddResourceRecordValue` :
+`SetResourceRecordSet` / `AddResourceRecordValue` (le type est renvoyé en majuscules et le TTL tel qu'envoyé, limité à 1–86400 secondes) :
 
 ```json
 { "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
@@ -798,7 +805,9 @@ dna.DeleteForwarding("example.com");
 { "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
 ```
 
-Lorsqu'aucune redirection n'est configurée, `GetForwarding` renvoie `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`.
+Lorsqu'aucune redirection n'est configurée (la passerelle répond `Redirect information not found`), `GetForwarding` renvoie `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`. Toute autre erreur — par exemple un domaine inexistant — est renvoyée comme une erreur.
+
+`DeleteForwarding` renvoie `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}` ; si rien n'était configuré, l'appel n'a aucun effet et répond `"Removed": false`.
 
 </details>
 
@@ -842,7 +851,8 @@ Les méthodes ne lèvent jamais d'exception pour les problèmes d'API ou de rés
   "error": {
     "Code": "API_404",
     "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again."
+    "Details": "The domain could not be found. Please check and try again.",
+    "GatewayCode": "Dna.DomainService:Domain:10007"
   }
 }
 ```
@@ -852,12 +862,13 @@ Les méthodes ne lèvent jamais d'exception pour les problèmes d'API ou de rés
 | Erreur HTTP renvoyée par la passerelle | `API_<status>`, par ex. `API_400`, `API_429`, `API_500` | le message de la passerelle ; pour un corps vide, `HTTP 429 - Too Many Requests` |
 | Identifiants incorrects (HTTP 301/302) | `API_302` | `Invalid API credentials` |
 | Erreurs de validation | `API_400` | le message de la passerelle ; `Details` liste les champs, par ex. `Admin PostalCode - 'PostalCode' is required` |
-| Délai d'attente dépassé | `API_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| Autres défaillances réseau (DNS, connexion, TLS, réinitialisation) | `API_6`, `API_7`, `API_60`, `API_56` | `Curl error during request: ...` |
+| Délai d'attente dépassé | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
+| Autres défaillances réseau (DNS, connexion, TLS, réinitialisation) | `CURL_6`, `CURL_7`, `CURL_60`, `CURL_56` | `Curl error during request: ...` |
+| Enregistrement, renouvellement ou transfert refusé (`"success": false`) | `REGISTER_DOMAIN`, `RENEW_DOMAIN`, `TRANSFER_DOMAIN` | le message de la passerelle |
 | Réponse de succès vide ou inexploitable | `RESPONSE` | `Invalid response received from server! Response is empty.` |
 | Vérifications effectuées avant l'appel à la passerelle | par ex. `AVAILABILITY`, `ADD_ZONE`, `SET_FORWARD` | une description du problème |
 
-Les codes réseau numériques suivent la numérotation de libcurl afin de correspondre à ceux de php-dna. Seules les erreurs de programmation (par exemple le passage d'un type d'objet non pris en charge) peuvent lever une exception.
+Les codes `API_<n>` désignent toujours un statut HTTP. Lorsque la passerelle a envoyé son propre code d'erreur, l'enveloppe le contient également sous `GatewayCode` (par exemple `Dna.DomainService:Domain:10007`), ce qui permet de distinguer « domaine introuvable » de « TLD non pris en charge » sans analyser le message. Les défaillances réseau utilisent `CURL_<n>`, dont le numéro suit la numérotation de libcurl afin que les codes correspondent à ceux de php-dna. Seules les erreurs de programmation (par exemple le passage d'un type d'objet non pris en charge) peuvent lever une exception.
 
 Pour le dépannage, le dernier appel peut être inspecté :
 
@@ -894,7 +905,7 @@ Lorsqu'un appel API échoue, la bibliothèque peut envoyer un rapport d'erreur a
 
 **Pourquoi et combien de temps :** les données servent uniquement à mesurer l'utilisation et à diagnostiquer les problèmes au plus tôt ; elles sont conservées 30 jours sur le serveur Sentry propre à DomainNameAPI, puis supprimées automatiquement.
 
-Les rapports sont envoyés en arrière-plan : ils ne bloquent ni ne ralentissent jamais votre appel et ne lèvent jamais d'exception. Les erreurs attendues et fréquentes (domaine introuvable, solde insuffisant, identifiants invalides, ...) ne sont pas signalées.
+Les rapports sont envoyés en arrière-plan : ils ne bloquent ni ne ralentissent jamais votre appel et ne lèvent jamais d'exception. Les erreurs attendues et fréquentes (domaine introuvable, solde insuffisant, identifiants invalides, aucune redirection configurée, ...) ne sont pas signalées.
 
 **Comment le désactiver :** appelez `SetErrorReportingEnabled(false)` après avoir créé le client :
 
@@ -945,7 +956,7 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet t
 
 | Fichier de test | Description |
 |-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | Rejoue les 126 fixtures de conformité de php-dna (`testdata/conformance/`) et compare les requêtes et les résultats |
+| `tests/DomainNameApi.Tests/ConformanceTests.cs` | Rejoue les 134 fixtures de conformité de php-dna (`testdata/conformance/`) et compare les requêtes et les résultats |
 | `tests/DomainNameApi.Tests/HttpLayerTests.cs` | En-têtes, URL, chaînes de requête, mode test, délais d'attente, espacement des appels de zone |
 | `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | Le transport `HttpClient` par défaut face à un écouteur local |
 | `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | Correspondance des erreurs de la passerelle et messages de validation |

@@ -14,7 +14,7 @@
 
 DomainNameAPI 经销商 REST API 的官方 .NET 客户端：域名搜索、注册、续费、转移、联系人、名称服务器、子名称服务器、DNS 区域以及 URL 转发。
 
-dotnet-dna 是 [php-dna](https://github.com/domainreseller/php-dna) 的忠实移植版本：相同的方法、在网络上发送相同的请求、返回相同的值。它通过 php-dna 的一致性测试用例（conformance fixtures，共 126 个场景）进行校验，因此针对 PHP 库编写的代码可以一一对应地迁移过来。
+dotnet-dna 是 [php-dna](https://github.com/domainreseller/php-dna) 的忠实移植版本：相同的方法、在网络上发送相同的请求、返回相同的值。它通过 php-dna 的一致性测试用例（conformance fixtures，共 134 个场景）进行校验，因此针对 PHP 库编写的代码可以一一对应地迁移过来。
 
 ## 📦 下载 — 请务必使用 Releases！
 
@@ -170,7 +170,7 @@ var result = dna.RegisterWithContactInfo(
     });
 ```
 
-联系人在发送前会被补全：缺失的字段会填入占位值，姓名中的数字和标点会被移除，州/省为空时回退为城市，国家名称会转换为 ISO 代码，电话号码会拆分为号码和国家代码（参见 `ValidateContact`）。如果未提供名称服务器（或仅提供了空值），则使用 `ns1.domainnameapi.com` 和 `ns2.domainnameapi.com`。对于 .tr 域名，TRABIS 属性会被精简为网关所接受的内容（`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`、`TRABISCITIZENID`、`TRABISTAXOFFICE`、`TRABISTAXNUMBER`）；旧版键 `TRABISCITIZIENID` 和数字形式的类别会自动转换。
+联系人在发送前会被补全：缺失的字段会填入占位值，姓名中的数字和标点会被移除，州/省缺失或为空时回退为城市，国家名称会转换为 ISO 代码，电话号码会拆分为号码和国家代码 — 以 `+` 或 `00` 自带国家代码书写的号码会保留该代码（参见 `ValidateContact`）。如果未提供名称服务器（或仅提供了空值），则使用 `ns1.domainnameapi.com` 和 `ns2.domainnameapi.com`。对于 .tr 域名，TRABIS 属性会被精简为网关所接受的内容（`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`、`TRABISCITIZENID`、`TRABISTAXOFFICE`、`TRABISTAXNUMBER`）；旧版键 `TRABISCITIZIENID` 和数字形式的类别会自动转换。
 
 <details>
 <summary>域名注册示例输出</summary>
@@ -202,6 +202,8 @@ var result = dna.RegisterWithContactInfo(
 
 </details>
 
+如果网关拒绝该订单（返回 `"success": false`），该方法会返回错误封装，其中 `Code` = `REGISTER_DOMAIN` 并附带网关的消息，因此被拒绝的注册绝不会被报告为已完成。`Renew`（`RENEW_DOMAIN`）和 `Transfer`（`TRANSFER_DOMAIN`）的行为相同。
+
 <hr style="border: 4px solid #000; border-style: dashed;">
 
 #### 域名续费
@@ -227,7 +229,7 @@ var result = dna.Renew("example.com", 1);
 var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
 ```
 
-> ℹ️ 与 php-dna 的公共接口一样，`Transfer` 发送的是空的联系人列表；可选参数 `contacts` 仅为保持方法签名一致而存在。
+> ℹ️ 转移从不发送联系人：请求始终携带空的联系人列表，由注册商自行接管联系人。因此 `Transfer` 没有联系人参数；如有需要，请在转移完成后使用 `SaveContacts` 更新联系人。
 
 <details>
 <summary>域名转移示例输出</summary>
@@ -558,8 +560,13 @@ var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.
 #### 修改隐私保护状态
 
 ```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true, "Owner request");
+var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
+
+// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
+var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
 ```
+
+可选的第三个参数（`reason`）仅为兼容性而保留；网关没有该字段，也不会发送它。
 
 <details>
 <summary>修改隐私保护状态示例输出</summary>
@@ -677,12 +684,12 @@ var result = dna.GetResellerDetails();
   "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "active": true,
   "name": "Example Reseller",
-  "balance": "500",
+  "balance": "500.00",
   "currency": "USD",
   "symbol": "$",
   "balances": [
-    { "balance": "500", "currency": "USD", "symbol": "$" },
-    { "balance": "1500", "currency": "TL", "symbol": "TL" }
+    { "balance": "500.00", "currency": "USD", "symbol": "$" },
+    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
   ]
 }
 ```
@@ -713,7 +720,7 @@ var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
 }
 ```
 
-失败时，`OperationResult` 为 `FAILED`，`ErrorCode` 包含错误代码（例如 `API_429`），`Balance` 为 `"0.00"`。
+失败时，`OperationResult` 为 `FAILED`，`ErrorCode` 包含错误代码（例如 `API_429`），`Balance` 为 `"0.00"`。账户仅报告 USD 和 TRY 余额；请求其他货币（EUR、GBP 等）会失败，`ErrorCode` = `BALANCE`，消息为 `No EUR balance is reported for this account. Available: USD, TRY.`
 
 </details>
 
@@ -721,7 +728,7 @@ var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
 
 #### DNS 区域管理
 
-网关以记录**集**（名称 + 类型 → 值）的形式存储区域，并在每次写入时替换整个记录集。`*ResourceRecordSet` 和 `*ResourceRecordValue` 方法会替您处理这一点。名称可以是相对名称（`www`）、区域顶点（`@`、`""` 或 `example.com`），也可以是完全限定名称（`www.example.com.`）。支持的类型：`A`、`AAAA`、`ALIAS`、`CAA`、`CNAME`、`DS`、`MX`、`NAPTR`、`PTR`、`SRV`、`TLSA`、`TXT`。除非您传入 `apply: false` 并自行调用 `ApplyResourceRecords`，否则写入会立即生效。连续的区域调用之间至少间隔一秒，因为网关会对突发请求返回 HTTP 429。
+网关以记录**集**（名称 + 类型 → 值）的形式存储区域，并在每次写入时替换整个记录集。`*ResourceRecordSet` 和 `*ResourceRecordValue` 方法会替您处理这一点。名称可以是相对名称（`www`）、区域顶点（`@`、`""` 或 `example.com`），也可以是完全限定名称（`www.example.com.`）。支持的类型：`A`、`AAAA`、`ALIAS`、`CAA`、`CNAME`、`DS`、`MX`、`NAPTR`、`PTR`、`SRV`、`TLSA`、`TXT`。除非您传入 `apply: false` 并自行调用 `ApplyResourceRecords`，否则写入会立即生效；如果该自动应用失败，方法会返回应用错误（更改仍处于暂存状态，尚未生效）。连续的区域调用之间至少间隔一秒，因为网关会对突发请求返回 HTTP 429。
 
 ```csharp
 // List every record (one row per value; names are fully qualified)
@@ -767,7 +774,7 @@ dna.ApplyResourceRecords("example.com");
 }
 ```
 
-`SetResourceRecordSet` / `AddResourceRecordValue`:
+`SetResourceRecordSet` / `AddResourceRecordValue`（类型以大写形式返回，TTL 按发送值返回，范围限制为 1–86400 秒）：
 
 ```json
 { "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
@@ -798,7 +805,9 @@ dna.DeleteForwarding("example.com");
 { "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
 ```
 
-未配置转发时，`GetForwarding` 返回 `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`。
+未配置转发时（网关返回 `Redirect information not found`），`GetForwarding` 返回 `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`。其他任何错误 — 例如域名不存在 — 都会作为错误返回。
+
+`DeleteForwarding` 返回 `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}`；如果原本没有任何配置，则不执行任何操作并返回 `"Removed": false`。
 
 </details>
 
@@ -842,7 +851,8 @@ var contact = dna.ValidateContact(new Dictionary<string, object>
   "error": {
     "Code": "API_404",
     "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again."
+    "Details": "The domain could not be found. Please check and try again.",
+    "GatewayCode": "Dna.DomainService:Domain:10007"
   }
 }
 ```
@@ -852,12 +862,13 @@ var contact = dna.ValidateContact(new Dictionary<string, object>
 | 网关返回的 HTTP 错误 | `API_<status>`，例如 `API_400`、`API_429`、`API_500` | 网关的消息；响应体为空时为 `HTTP 429 - Too Many Requests` |
 | 凭据错误（HTTP 301/302） | `API_302` | `Invalid API credentials` |
 | 验证错误 | `API_400` | 网关的消息；`Details` 列出相关字段，例如 `Admin PostalCode - 'PostalCode' is required` |
-| 超时 | `API_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| 其他网络故障（DNS、连接、TLS、连接重置） | `API_6`、`API_7`、`API_60`、`API_56` | `Curl error during request: ...` |
+| 超时 | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
+| 其他网络故障（DNS、连接、TLS、连接重置） | `CURL_6`、`CURL_7`、`CURL_60`、`CURL_56` | `Curl error during request: ...` |
+| 注册、续费或转移被拒绝（`"success": false`） | `REGISTER_DOMAIN`、`RENEW_DOMAIN`、`TRANSFER_DOMAIN` | 网关的消息 |
 | 成功响应为空或无法使用 | `RESPONSE` | `Invalid response received from server! Response is empty.` |
 | 调用网关之前执行的检查 | 例如 `AVAILABILITY`、`ADD_ZONE`、`SET_FORWARD` | 问题描述 |
 
-数字网络错误代码沿用 libcurl 的编号，以便与 php-dna 保持一致。只有编程错误（例如传入不受支持的对象类型）才可能抛出异常。
+`API_<n>` 代码始终表示 HTTP 状态。当网关发送了自己的错误代码时，封装中还会以 `GatewayCode` 携带该代码（例如 `Dna.DomainService:Domain:10007`），这样无需解析消息即可区分"域名未找到"和"不支持该 TLD"。网络故障使用 `CURL_<n>`，其中的数字沿用 libcurl 的编号，以便与 php-dna 的代码保持一致。只有编程错误（例如传入不受支持的对象类型）才可能抛出异常。
 
 排查问题时，可以检查最近一次调用：
 
@@ -894,7 +905,7 @@ dna.GetParsedResponseData(); // parsed response or the error built from it
 
 **用途与保留期限：** 这些数据仅用于使用情况统计和问题的早期诊断，在 DomainNameAPI 自己的 Sentry 服务器上保留 30 天，之后自动删除。
 
-报告在后台发送：绝不会阻塞或减慢您的调用，也绝不会抛出异常。预期内的高频错误（域名未找到、余额不足、凭据无效等）不会被报告。
+报告在后台发送：绝不会阻塞或减慢您的调用，也绝不会抛出异常。预期内的高频错误（域名未找到、余额不足、凭据无效、未配置转发等）不会被报告。
 
 **如何关闭：** 在创建客户端后调用 `SetErrorReportingEnabled(false)`：
 
@@ -945,7 +956,7 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet t
 
 | 测试文件 | 说明 |
 |-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | 重放 php-dna 的全部 126 个一致性测试用例（`testdata/conformance/`），并比对请求和结果 |
+| `tests/DomainNameApi.Tests/ConformanceTests.cs` | 重放 php-dna 的全部 134 个一致性测试用例（`testdata/conformance/`），并比对请求和结果 |
 | `tests/DomainNameApi.Tests/HttpLayerTests.cs` | 请求头、URL、查询字符串、测试模式、超时、区域调用节流 |
 | `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | 针对本地监听器测试默认的 `HttpClient` 传输层 |
 | `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | 网关错误映射和验证消息 |

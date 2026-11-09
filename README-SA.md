@@ -14,7 +14,7 @@
 
 عميل .NET الرسمي لواجهة DomainNameAPI REST API الخاصة بالموزعين: البحث عن النطاقات، والتسجيل، والتجديد، والنقل، وجهات الاتصال، وخوادم الأسماء، وخوادم الأسماء الفرعية، ومناطق DNS، وإعادة توجيه عناوين URL.
 
-تُعدّ dotnet-dna نقلًا أمينًا لمكتبة [php-dna](https://github.com/domainreseller/php-dna): الدوال نفسها، والطلبات نفسها على مستوى الشبكة، والقيم المُعادة نفسها. ويتم التحقق منها مقابل ملفات المطابقة (conformance fixtures) الخاصة بـ php-dna ‏(126 سيناريو)، لذا فإن الشيفرة المكتوبة لمكتبة PHP تنتقل إليها سطرًا بسطر.
+تُعدّ dotnet-dna نقلًا أمينًا لمكتبة [php-dna](https://github.com/domainreseller/php-dna): الدوال نفسها، والطلبات نفسها على مستوى الشبكة، والقيم المُعادة نفسها. ويتم التحقق منها مقابل ملفات المطابقة (conformance fixtures) الخاصة بـ php-dna ‏(134 سيناريو)، لذا فإن الشيفرة المكتوبة لمكتبة PHP تنتقل إليها سطرًا بسطر.
 
 ## 📦 التنزيل — استخدم دائمًا صفحة الإصدارات (Releases)!
 
@@ -170,7 +170,7 @@ var result = dna.RegisterWithContactInfo(
     });
 ```
 
-تُستكمل جهات الاتصال قبل إرسالها: الحقول الناقصة تحصل على قيم بديلة، وتُزال الأرقام وعلامات الترقيم من الأسماء، وتُستخدم المدينة عندما تكون الولاية فارغة، وتتحول أسماء الدول إلى رموز ISO، وتُقسَّم أرقام الهواتف إلى رقم ورمز دولة (انظر `ValidateContact`). عند عدم تحديد أي خادم أسماء (أو تحديد خوادم فارغة فقط)، يُستخدم `ns1.domainnameapi.com` و `ns2.domainnameapi.com`. بالنسبة لنطاقات .tr تُختصر سمات TRABIS إلى ما تقبله البوابة (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`، `TRABISCITIZENID`، `TRABISTAXOFFICE`، `TRABISTAXNUMBER`)؛ ويتم تحويل المفتاح القديم `TRABISCITIZIENID` والفئة الرقمية تلقائيًا.
+تُستكمل جهات الاتصال قبل إرسالها: الحقول الناقصة تحصل على قيم بديلة، وتُزال الأرقام وعلامات الترقيم من الأسماء، وتُستخدم المدينة عندما تكون الولاية مفقودة أو فارغة، وتتحول أسماء الدول إلى رموز ISO، وتُقسَّم أرقام الهواتف إلى رقم ورمز دولة — والرقم المكتوب برمز دولته الخاص بصيغة `+` أو `00` يحتفظ بذلك الرمز (انظر `ValidateContact`). عند عدم تحديد أي خادم أسماء (أو تحديد خوادم فارغة فقط)، يُستخدم `ns1.domainnameapi.com` و `ns2.domainnameapi.com`. بالنسبة لنطاقات .tr تُختصر سمات TRABIS إلى ما تقبله البوابة (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`، `TRABISCITIZENID`، `TRABISTAXOFFICE`، `TRABISTAXNUMBER`)؛ ويتم تحويل المفتاح القديم `TRABISCITIZIENID` والفئة الرقمية تلقائيًا.
 
 <details>
 <summary>مثال على مخرجات تسجيل النطاق</summary>
@@ -202,6 +202,8 @@ var result = dna.RegisterWithContactInfo(
 
 </details>
 
+إذا رفضت البوابة الطلب (أي أجابت بـ `"success": false`)، تُعيد الدالة غلاف خطأ مع `Code` = `REGISTER_DOMAIN` ورسالة البوابة، وبذلك لا يُبلَّغ أبدًا عن تسجيل مرفوض على أنه تم. وتتصرف `Renew` ‏(`RENEW_DOMAIN`) و `Transfer` ‏(`TRANSFER_DOMAIN`) بالطريقة نفسها.
+
 <hr style="border: 4px solid #000; border-style: dashed;">
 
 #### تجديد النطاق
@@ -227,7 +229,7 @@ var result = dna.Renew("example.com", 1);
 var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
 ```
 
-> ℹ️ كما في الواجهة العامة لـ php-dna، تُرسل `Transfer` قائمة جهات اتصال فارغة؛ ويوجد المُعامِل الاختياري `contacts` فقط للحفاظ على تطابق التوقيع.
+> ℹ️ لا يُرسل النقل جهات اتصال أبدًا: يحمل الطلب دائمًا قائمة جهات اتصال فارغة، ويتولى المسجّل نقل جهات الاتصال بنفسه. لذلك لا تحتوي `Transfer` على مُعامِل لجهات الاتصال؛ وعند الحاجة، حدّث جهات الاتصال باستخدام `SaveContacts` بعد اكتمال النقل.
 
 <details>
 <summary>مثال على مخرجات نقل النطاق</summary>
@@ -558,8 +560,13 @@ var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.
 #### تعديل حالة حماية الخصوصية
 
 ```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true, "Owner request");
+var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
+
+// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
+var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
 ```
+
+المُعامِل الثالث الاختياري (`reason`) محفوظ لأغراض التوافق فقط؛ إذ لا يوجد مثل هذا الحقل لدى البوابة ولا يتم إرساله.
 
 <details>
 <summary>مثال على مخرجات تعديل حالة حماية الخصوصية</summary>
@@ -677,12 +684,12 @@ var result = dna.GetResellerDetails();
   "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "active": true,
   "name": "Example Reseller",
-  "balance": "500",
+  "balance": "500.00",
   "currency": "USD",
   "symbol": "$",
   "balances": [
-    { "balance": "500", "currency": "USD", "symbol": "$" },
-    { "balance": "1500", "currency": "TL", "symbol": "TL" }
+    { "balance": "500.00", "currency": "USD", "symbol": "$" },
+    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
   ]
 }
 ```
@@ -713,7 +720,7 @@ var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
 }
 ```
 
-عند الفشل تكون قيمة `OperationResult` هي `FAILED`، ويحتوي `ErrorCode` على رمز الخطأ (مثل `API_429`)، وتكون قيمة `Balance` هي `"0.00"`.
+عند الفشل تكون قيمة `OperationResult` هي `FAILED`، ويحتوي `ErrorCode` على رمز الخطأ (مثل `API_429`)، وتكون قيمة `Balance` هي `"0.00"`. يُبلغ الحساب عن أرصدة USD و TRY فقط؛ وطلب عملة أخرى (EUR، GBP، ...) يفشل مع `ErrorCode` = `BALANCE` والرسالة `No EUR balance is reported for this account. Available: USD, TRY.`
 
 </details>
 
@@ -721,7 +728,7 @@ var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
 
 #### إدارة منطقة DNS
 
-تخزّن البوابة المنطقة على شكل **مجموعات** سجلات (الاسم + النوع ← القيم) وتستبدل المجموعة كاملة عند كل عملية كتابة. تتولى الدوال `*ResourceRecordSet` و `*ResourceRecordValue` ذلك نيابة عنك. يمكن أن تكون الأسماء نسبية (`www`)، أو الجذر (`@` أو `""` أو `example.com`)، أو مؤهلة بالكامل (`www.example.com.`). الأنواع المدعومة: `A`، `AAAA`، `ALIAS`، `CAA`، `CNAME`، `DS`، `MX`، `NAPTR`، `PTR`، `SRV`، `TLSA`، `TXT`. تُعتمد عمليات الكتابة فورًا ما لم تمرر `apply: false` وتستدعِ `ApplyResourceRecords` بنفسك. يُفصل بين استدعاءات المنطقة المتتالية بثانية واحدة على الأقل، لأن البوابة ترد على الطلبات المتلاحقة بـ HTTP 429.
+تخزّن البوابة المنطقة على شكل **مجموعات** سجلات (الاسم + النوع ← القيم) وتستبدل المجموعة كاملة عند كل عملية كتابة. تتولى الدوال `*ResourceRecordSet` و `*ResourceRecordValue` ذلك نيابة عنك. يمكن أن تكون الأسماء نسبية (`www`)، أو الجذر (`@` أو `""` أو `example.com`)، أو مؤهلة بالكامل (`www.example.com.`). الأنواع المدعومة: `A`، `AAAA`، `ALIAS`، `CAA`، `CNAME`، `DS`، `MX`، `NAPTR`، `PTR`، `SRV`، `TLSA`، `TXT`. تُعتمد عمليات الكتابة فورًا ما لم تمرر `apply: false` وتستدعِ `ApplyResourceRecords` بنفسك؛ وإذا فشل ذلك الاعتماد التلقائي، تُعيد الدالة خطأ الاعتماد (ويبقى التغيير مُجهَّزًا وغير مُفعَّل). يُفصل بين استدعاءات المنطقة المتتالية بثانية واحدة على الأقل، لأن البوابة ترد على الطلبات المتلاحقة بـ HTTP 429.
 
 ```csharp
 // List every record (one row per value; names are fully qualified)
@@ -767,7 +774,7 @@ dna.ApplyResourceRecords("example.com");
 }
 ```
 
-`SetResourceRecordSet` / `AddResourceRecordValue`:
+`SetResourceRecordSet` / `AddResourceRecordValue` (يُعرض النوع بأحرف كبيرة و TTL كما أُرسل، ضمن النطاق 1–86400 ثانية):
 
 ```json
 { "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
@@ -798,7 +805,9 @@ dna.DeleteForwarding("example.com");
 { "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
 ```
 
-عند عدم تهيئة أي إعادة توجيه، تُعيد `GetForwarding` القيمة `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`.
+عند عدم تهيئة أي إعادة توجيه (تجيب البوابة بـ `Redirect information not found`)، تُعيد `GetForwarding` القيمة `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`. أما أي خطأ آخر — على سبيل المثال نطاق غير موجود — فيُعاد كخطأ.
+
+تُعيد `DeleteForwarding` القيمة `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}`؛ وعندما لا يكون هناك شيء مُهيَّأ، لا تُجري أي تغيير وتجيب بـ `"Removed": false`.
 
 </details>
 
@@ -842,7 +851,8 @@ var contact = dna.ValidateContact(new Dictionary<string, object>
   "error": {
     "Code": "API_404",
     "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again."
+    "Details": "The domain could not be found. Please check and try again.",
+    "GatewayCode": "Dna.DomainService:Domain:10007"
   }
 }
 ```
@@ -852,12 +862,13 @@ var contact = dna.ValidateContact(new Dictionary<string, object>
 | خطأ HTTP من البوابة | `API_<status>`، مثل `API_400`، `API_429`، `API_500` | رسالة البوابة؛ وعند استجابة فارغة `HTTP 429 - Too Many Requests` |
 | بيانات اعتماد خاطئة (HTTP 301/302) | `API_302` | `Invalid API credentials` |
 | أخطاء التحقق من الصحة | `API_400` | رسالة البوابة؛ ويسرد `Details` الحقول، مثل `Admin PostalCode - 'PostalCode' is required` |
-| انتهاء المهلة | `API_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| أعطال الشبكة الأخرى (DNS، الاتصال، TLS، إعادة التعيين) | `API_6`، `API_7`، `API_60`، `API_56` | `Curl error during request: ...` |
+| انتهاء المهلة | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
+| أعطال الشبكة الأخرى (DNS، الاتصال، TLS، إعادة التعيين) | `CURL_6`، `CURL_7`، `CURL_60`، `CURL_56` | `Curl error during request: ...` |
+| رفض التسجيل أو التجديد أو النقل (`"success": false`) | `REGISTER_DOMAIN`، `RENEW_DOMAIN`، `TRANSFER_DOMAIN` | رسالة البوابة |
 | استجابة نجاح فارغة أو غير قابلة للاستخدام | `RESPONSE` | `Invalid response received from server! Response is empty.` |
 | فحوصات تُجرى قبل استدعاء البوابة | مثل `AVAILABILITY`، `ADD_ZONE`، `SET_FORWARD` | وصف للمشكلة |
 
-تتبع رموز الشبكة الرقمية ترقيم libcurl لكي تتطابق مع php-dna. فقط الأخطاء البرمجية (مثل تمرير نوع كائن غير مدعوم) يمكن أن تُطلق استثناءات.
+تشير رموز `API_<n>` دائمًا إلى حالة HTTP. وعندما ترسل البوابة رمز الخطأ الخاص بها، يحمله الغلاف أيضًا في `GatewayCode` (مثل `Dna.DomainService:Domain:10007`)، بحيث يمكنك التمييز بين "النطاق غير موجود" و"امتداد النطاق غير مدعوم" دون تحليل الرسالة. تستخدم أعطال الشبكة `CURL_<n>`، حيث يتبع الرقم ترقيم libcurl لكي تتطابق الرموز مع php-dna. فقط الأخطاء البرمجية (مثل تمرير نوع كائن غير مدعوم) يمكن أن تُطلق استثناءات.
 
 لأغراض استكشاف الأخطاء وإصلاحها، يمكن فحص آخر استدعاء:
 
@@ -894,7 +905,7 @@ dna.GetParsedResponseData(); // parsed response or the error built from it
 
 **لماذا وإلى متى:** تُستخدم البيانات فقط لقياس الاستخدام والتشخيص المبكر للمشكلات، وتُحفظ لمدة 30 يومًا على خادم Sentry الخاص بـ DomainNameAPI، ثم تُحذف تلقائيًا.
 
-تُرسَل التقارير في الخلفية: فهي لا تحجب استدعاءك ولا تبطئه أبدًا، ولا تُطلق استثناءات أبدًا. ولا يتم الإبلاغ عن الأخطاء المتوقعة كثيرة التكرار (نطاق غير موجود، رصيد غير كافٍ، بيانات اعتماد غير صالحة، ...).
+تُرسَل التقارير في الخلفية: فهي لا تحجب استدعاءك ولا تبطئه أبدًا، ولا تُطلق استثناءات أبدًا. ولا يتم الإبلاغ عن الأخطاء المتوقعة كثيرة التكرار (نطاق غير موجود، رصيد غير كافٍ، بيانات اعتماد غير صالحة، عدم تهيئة إعادة توجيه، ...).
 
 **كيفية إيقافها:** استدعِ `SetErrorReportingEnabled(false)` بعد إنشاء العميل:
 
@@ -945,7 +956,7 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet t
 
 | ملف الاختبار | الوصف |
 |-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | يعيد تشغيل جميع ملفات المطابقة الـ 126 الخاصة بـ php-dna ‏(`testdata/conformance/`) ويقارن الطلبات والنتائج |
+| `tests/DomainNameApi.Tests/ConformanceTests.cs` | يعيد تشغيل جميع ملفات المطابقة الـ 134 الخاصة بـ php-dna ‏(`testdata/conformance/`) ويقارن الطلبات والنتائج |
 | `tests/DomainNameApi.Tests/HttpLayerTests.cs` | الترويسات، وعناوين URL، وسلاسل الاستعلام، ووضع الاختبار، والمهلات الزمنية، وتنظيم وتيرة طلبات المنطقة |
 | `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | طبقة النقل الافتراضية `HttpClient` مقابل مستمع محلي |
 | `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | ربط أخطاء البوابة ورسائل التحقق من الصحة |

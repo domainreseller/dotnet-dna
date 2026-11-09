@@ -14,7 +14,7 @@
 
 Il client .NET ufficiale per l'API REST rivenditori di DomainNameAPI: ricerca domini, registrazione, rinnovo, trasferimenti, contatti, name server, child name server, zone DNS e inoltro URL.
 
-dotnet-dna è un porting fedele di [php-dna](https://github.com/domainreseller/php-dna): gli stessi metodi, le stesse richieste inviate in rete e gli stessi valori di ritorno. È verificato con le fixture di conformità di php-dna (126 scenari), quindi il codice scritto per la libreria PHP si traduce in modo diretto, uno a uno.
+dotnet-dna è un porting fedele di [php-dna](https://github.com/domainreseller/php-dna): gli stessi metodi, le stesse richieste inviate in rete e gli stessi valori di ritorno. È verificato con le fixture di conformità di php-dna (134 scenari), quindi il codice scritto per la libreria PHP si traduce in modo diretto, uno a uno.
 
 ## 📦 Download — usa sempre le Releases!
 
@@ -170,7 +170,7 @@ var result = dna.RegisterWithContactInfo(
     });
 ```
 
-I contatti vengono completati prima dell'invio: i campi mancanti ricevono valori segnaposto, cifre e punteggiatura vengono rimosse dai nomi, uno stato/provincia vuoto viene sostituito dalla città, i nomi dei paesi diventano codici ISO e i numeri di telefono vengono separati in numero e prefisso internazionale (vedi `ValidateContact`). Se non viene indicato alcun name server (o solo valori vuoti), vengono usati `ns1.domainnameapi.com` e `ns2.domainnameapi.com`. Per i domini .tr gli attributi TRABIS vengono ridotti a quelli accettati dal gateway (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`); la vecchia chiave `TRABISCITIZIENID` e la categoria numerica vengono convertite automaticamente.
+I contatti vengono completati prima dell'invio: i campi mancanti ricevono valori segnaposto, cifre e punteggiatura vengono rimosse dai nomi, uno stato/provincia mancante o vuoto viene sostituito dalla città, i nomi dei paesi diventano codici ISO e i numeri di telefono vengono separati in numero e prefisso internazionale — un numero scritto con il proprio prefisso `+` o `00` mantiene quel prefisso (vedi `ValidateContact`). Se non viene indicato alcun name server (o solo valori vuoti), vengono usati `ns1.domainnameapi.com` e `ns2.domainnameapi.com`. Per i domini .tr gli attributi TRABIS vengono ridotti a quelli accettati dal gateway (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`); la vecchia chiave `TRABISCITIZIENID` e la categoria numerica vengono convertite automaticamente.
 
 <details>
 <summary>Output di Esempio per la Registrazione del Dominio</summary>
@@ -202,6 +202,8 @@ I contatti vengono completati prima dell'invio: i campi mancanti ricevono valori
 
 </details>
 
+Se il gateway rifiuta l'ordine (risponde `"success": false`), il metodo restituisce un envelope di errore con `Code` = `REGISTER_DOMAIN` e il messaggio del gateway, così una registrazione rifiutata non viene mai segnalata come completata. `Renew` (`RENEW_DOMAIN`) e `Transfer` (`TRANSFER_DOMAIN`) si comportano allo stesso modo.
+
 <hr style="border: 4px solid #000; border-style: dashed;">
 
 #### Rinnovo Dominio
@@ -227,7 +229,7 @@ var result = dna.Renew("example.com", 1);
 var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
 ```
 
-> ℹ️ Come la facade pubblica di php-dna, `Transfer` invia una lista di contatti vuota; il parametro opzionale `contacts` esiste solo per mantenere la stessa firma.
+> ℹ️ Un trasferimento non invia mai contatti: la richiesta contiene sempre una lista di contatti vuota e il registrar acquisisce i contatti autonomamente. Per questo `Transfer` non ha un parametro per i contatti; se necessario, aggiorna i contatti con `SaveContacts` dopo il completamento del trasferimento.
 
 <details>
 <summary>Output di Esempio per il Trasferimento del Dominio</summary>
@@ -558,8 +560,13 @@ var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.
 #### Modificare Protezione Privacy
 
 ```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true, "Owner request");
+var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
+
+// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
+var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
 ```
+
+Il terzo argomento opzionale (`reason`) è mantenuto solo per compatibilità; il gateway non prevede questo campo e non viene inviato.
 
 <details>
 <summary>Output di Esempio per Modificare Protezione Privacy</summary>
@@ -677,12 +684,12 @@ var result = dna.GetResellerDetails();
   "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "active": true,
   "name": "Example Reseller",
-  "balance": "500",
+  "balance": "500.00",
   "currency": "USD",
   "symbol": "$",
   "balances": [
-    { "balance": "500", "currency": "USD", "symbol": "$" },
-    { "balance": "1500", "currency": "TL", "symbol": "TL" }
+    { "balance": "500.00", "currency": "USD", "symbol": "$" },
+    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
   ]
 }
 ```
@@ -713,7 +720,7 @@ var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
 }
 ```
 
-In caso di errore `OperationResult` è `FAILED`, `ErrorCode` contiene il codice di errore (ad esempio `API_429`) e `Balance` è `"0.00"`.
+In caso di errore `OperationResult` è `FAILED`, `ErrorCode` contiene il codice di errore (ad esempio `API_429`) e `Balance` è `"0.00"`. L'account riporta solo i saldi in USD e TRY; richiedere un'altra valuta (EUR, GBP, ...) fallisce con `ErrorCode` = `BALANCE` e il messaggio `No EUR balance is reported for this account. Available: USD, TRY.`
 
 </details>
 
@@ -721,7 +728,7 @@ In caso di errore `OperationResult` è `FAILED`, `ErrorCode` contiene il codice 
 
 #### Gestione della Zona DNS
 
-Il gateway memorizza una zona come **set** di record (nome + tipo → valori) e sostituisce un intero set a ogni scrittura. I metodi `*ResourceRecordSet` e `*ResourceRecordValue` se ne occupano al posto tuo. I nomi possono essere relativi (`www`), l'apex (`@`, `""` o `example.com`) o completamente qualificati (`www.example.com.`). Tipi supportati: `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. Le scritture vengono applicate immediatamente, a meno che tu non passi `apply: false` e chiami tu stesso `ApplyResourceRecords`. Le chiamate di zona consecutive sono distanziate di almeno un secondo, perché il gateway risponde alle raffiche di richieste con HTTP 429.
+Il gateway memorizza una zona come **set** di record (nome + tipo → valori) e sostituisce un intero set a ogni scrittura. I metodi `*ResourceRecordSet` e `*ResourceRecordValue` se ne occupano al posto tuo. I nomi possono essere relativi (`www`), l'apex (`@`, `""` o `example.com`) o completamente qualificati (`www.example.com.`). Tipi supportati: `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. Le scritture vengono applicate immediatamente, a meno che tu non passi `apply: false` e chiami tu stesso `ApplyResourceRecords`; se questa applicazione automatica fallisce, il metodo restituisce l'errore di applicazione (la modifica resta in attesa e non viene pubblicata). Le chiamate di zona consecutive sono distanziate di almeno un secondo, perché il gateway risponde alle raffiche di richieste con HTTP 429.
 
 ```csharp
 // List every record (one row per value; names are fully qualified)
@@ -767,7 +774,7 @@ dna.ApplyResourceRecords("example.com");
 }
 ```
 
-`SetResourceRecordSet` / `AddResourceRecordValue`:
+`SetResourceRecordSet` / `AddResourceRecordValue` (il tipo viene riportato in maiuscolo e il TTL così come inviato, limitato a 1–86400 secondi):
 
 ```json
 { "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
@@ -798,7 +805,9 @@ dna.DeleteForwarding("example.com");
 { "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
 ```
 
-Se non è configurato alcun inoltro, `GetForwarding` restituisce `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`.
+Se non è configurato alcun inoltro (il gateway risponde `Redirect information not found`), `GetForwarding` restituisce `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`. Qualsiasi altro errore — ad esempio un dominio inesistente — viene restituito come errore.
+
+`DeleteForwarding` restituisce `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}`; se non era configurato nulla, la chiamata non ha effetto e risponde `"Removed": false`.
 
 </details>
 
@@ -842,7 +851,8 @@ I metodi non generano mai eccezioni per problemi di API o di rete; restituiscono
   "error": {
     "Code": "API_404",
     "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again."
+    "Details": "The domain could not be found. Please check and try again.",
+    "GatewayCode": "Dna.DomainService:Domain:10007"
   }
 }
 ```
@@ -852,12 +862,13 @@ I metodi non generano mai eccezioni per problemi di API o di rete; restituiscono
 | Errore HTTP restituito dal gateway | `API_<status>`, ad es. `API_400`, `API_429`, `API_500` | il messaggio del gateway; con un corpo vuoto, `HTTP 429 - Too Many Requests` |
 | Credenziali errate (HTTP 301/302) | `API_302` | `Invalid API credentials` |
 | Errori di validazione | `API_400` | il messaggio del gateway; `Details` elenca i campi, ad es. `Admin PostalCode - 'PostalCode' is required` |
-| Timeout | `API_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| Altri errori di rete (DNS, connessione, TLS, reset) | `API_6`, `API_7`, `API_60`, `API_56` | `Curl error during request: ...` |
+| Timeout | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
+| Altri errori di rete (DNS, connessione, TLS, reset) | `CURL_6`, `CURL_7`, `CURL_60`, `CURL_56` | `Curl error during request: ...` |
+| Registrazione, rinnovo o trasferimento rifiutato (`"success": false`) | `REGISTER_DOMAIN`, `RENEW_DOMAIN`, `TRANSFER_DOMAIN` | il messaggio del gateway |
 | Risposta di successo vuota o inutilizzabile | `RESPONSE` | `Invalid response received from server! Response is empty.` |
 | Controlli eseguiti prima di chiamare il gateway | ad es. `AVAILABILITY`, `ADD_ZONE`, `SET_FORWARD` | una descrizione del problema |
 
-I codici di rete numerici seguono la numerazione di libcurl, in modo da corrispondere a quelli di php-dna. Solo gli errori di programmazione (ad esempio il passaggio di un tipo di oggetto non supportato) possono generare eccezioni.
+I codici `API_<n>` indicano sempre uno stato HTTP. Quando il gateway ha inviato un proprio codice di errore, l'envelope lo riporta anche come `GatewayCode` (ad esempio `Dna.DomainService:Domain:10007`), così puoi distinguere "dominio non trovato" da "TLD non supportato" senza analizzare il messaggio. Gli errori di rete usano `CURL_<n>`, il cui numero segue la numerazione di libcurl, in modo che i codici corrispondano a quelli di php-dna. Solo gli errori di programmazione (ad esempio il passaggio di un tipo di oggetto non supportato) possono generare eccezioni.
 
 Per la risoluzione dei problemi è possibile ispezionare l'ultima chiamata:
 
@@ -894,7 +905,7 @@ Quando una chiamata API fallisce, la libreria può inviare una segnalazione di e
 
 **Perché e per quanto tempo:** i dati vengono usati esclusivamente per misurare l'utilizzo e diagnosticare tempestivamente i problemi, e sono conservati per 30 giorni sul server Sentry di DomainNameAPI, dopodiché vengono eliminati automaticamente.
 
-Le segnalazioni vengono inviate in background: non bloccano né rallentano mai la tua chiamata e non generano mai eccezioni. Gli errori attesi e frequenti (dominio non trovato, saldo insufficiente, credenziali non valide, ...) non vengono segnalati.
+Le segnalazioni vengono inviate in background: non bloccano né rallentano mai la tua chiamata e non generano mai eccezioni. Gli errori attesi e frequenti (dominio non trovato, saldo insufficiente, credenziali non valide, nessun inoltro configurato, ...) non vengono segnalati.
 
 **Come disattivarla:** chiama `SetErrorReportingEnabled(false)` dopo aver creato il client:
 
@@ -945,7 +956,7 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet t
 
 | File di test | Descrizione |
 |-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | Riesegue tutte le 126 fixture di conformità di php-dna (`testdata/conformance/`) e confronta richieste e risultati |
+| `tests/DomainNameApi.Tests/ConformanceTests.cs` | Riesegue tutte le 134 fixture di conformità di php-dna (`testdata/conformance/`) e confronta richieste e risultati |
 | `tests/DomainNameApi.Tests/HttpLayerTests.cs` | Header, URL, query string, modalità test, timeout, cadenzamento delle chiamate di zona |
 | `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | Il transport `HttpClient` predefinito contro un listener locale |
 | `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | Mappatura degli errori del gateway e messaggi di validazione |

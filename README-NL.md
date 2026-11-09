@@ -14,7 +14,7 @@
 
 De officiële .NET-client voor de reseller-REST-API van DomainNameAPI: domeinen zoeken, registreren, verlengen, transfers, contacten, nameservers, child nameservers, DNS-zones en URL-doorsturing.
 
-dotnet-dna is een getrouwe port van [php-dna](https://github.com/domainreseller/php-dna): dezelfde methoden, dezelfde verzoeken over de lijn en dezelfde retourwaarden. De bibliotheek wordt getoetst aan de conformiteitsfixtures van php-dna (126 scenario's), zodat code die voor de PHP-bibliotheek is geschreven één op één over te zetten is.
+dotnet-dna is een getrouwe port van [php-dna](https://github.com/domainreseller/php-dna): dezelfde methoden, dezelfde verzoeken over de lijn en dezelfde retourwaarden. De bibliotheek wordt getoetst aan de conformiteitsfixtures van php-dna (134 scenario's), zodat code die voor de PHP-bibliotheek is geschreven één op één over te zetten is.
 
 ## 📦 Download — gebruik altijd de Releases!
 
@@ -170,7 +170,7 @@ var result = dna.RegisterWithContactInfo(
     });
 ```
 
-Contacten worden aangevuld voordat ze worden verzonden: ontbrekende velden krijgen plaatsaanduidingswaarden, cijfers en leestekens worden uit namen verwijderd, een lege provincie/staat wordt vervangen door de plaats, landnamen worden omgezet naar ISO-codes en telefoonnummers worden opgesplitst in nummer en landcode (zie `ValidateContact`). Wanneer er geen nameserver (of alleen lege) wordt opgegeven, worden `ns1.domainnameapi.com` en `ns2.domainnameapi.com` gebruikt. Voor .tr-domeinen worden de TRABIS-attributen teruggebracht tot wat de gateway accepteert (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`); de verouderde sleutel `TRABISCITIZIENID` en de numerieke categorie worden automatisch omgezet.
+Contacten worden aangevuld voordat ze worden verzonden: ontbrekende velden krijgen plaatsaanduidingswaarden, cijfers en leestekens worden uit namen verwijderd, een ontbrekende of lege provincie/staat wordt vervangen door de plaats, landnamen worden omgezet naar ISO-codes en telefoonnummers worden opgesplitst in nummer en landcode — een nummer dat met een eigen landcode via `+` of `00` is geschreven, behoudt die code (zie `ValidateContact`). Wanneer er geen nameserver (of alleen lege) wordt opgegeven, worden `ns1.domainnameapi.com` en `ns2.domainnameapi.com` gebruikt. Voor .tr-domeinen worden de TRABIS-attributen teruggebracht tot wat de gateway accepteert (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`); de verouderde sleutel `TRABISCITIZIENID` en de numerieke categorie worden automatisch omgezet.
 
 <details>
 <summary>Voorbeelduitvoer voor domeinregistratie</summary>
@@ -202,6 +202,8 @@ Contacten worden aangevuld voordat ze worden verzonden: ontbrekende velden krijg
 
 </details>
 
+Als de gateway de bestelling weigert (hij antwoordt met `"success": false`), geeft de methode een foutenvelop terug met `Code` = `REGISTER_DOMAIN` en de melding van de gateway, zodat een geweigerde registratie nooit als voltooid wordt gemeld. `Renew` (`RENEW_DOMAIN`) en `Transfer` (`TRANSFER_DOMAIN`) gedragen zich op dezelfde manier.
+
 <hr style="border: 4px solid #000; border-style: dashed;">
 
 #### Domeinverlenging
@@ -227,7 +229,7 @@ var result = dna.Renew("example.com", 1);
 var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
 ```
 
-> ℹ️ Net als de publieke facade van php-dna verstuurt `Transfer` een lege contactenlijst; de optionele parameter `contacts` bestaat alleen om de signatuur gelijk te houden.
+> ℹ️ Een transfer verstuurt nooit contacten: het verzoek bevat altijd een lege contactenlijst en de registrar neemt de contacten zelf over. `Transfer` heeft daarom geen contactparameter; werk de contacten indien nodig na afloop van de transfer bij met `SaveContacts`.
 
 <details>
 <summary>Voorbeelduitvoer voor domeintransfer</summary>
@@ -558,8 +560,13 @@ var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.
 #### Domeinprivacy wijzigen
 
 ```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true, "Owner request");
+var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
+
+// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
+var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
 ```
+
+Het optionele derde argument (`reason`) bestaat alleen voor compatibiliteit; de gateway kent zo'n veld niet en het wordt niet verzonden.
 
 <details>
 <summary>Voorbeelduitvoer voor het wijzigen van domeinprivacy</summary>
@@ -677,12 +684,12 @@ var result = dna.GetResellerDetails();
   "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "active": true,
   "name": "Example Reseller",
-  "balance": "500",
+  "balance": "500.00",
   "currency": "USD",
   "symbol": "$",
   "balances": [
-    { "balance": "500", "currency": "USD", "symbol": "$" },
-    { "balance": "1500", "currency": "TL", "symbol": "TL" }
+    { "balance": "500.00", "currency": "USD", "symbol": "$" },
+    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
   ]
 }
 ```
@@ -713,7 +720,7 @@ var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
 }
 ```
 
-Bij een fout is `OperationResult` gelijk aan `FAILED`, bevat `ErrorCode` de foutcode (bijvoorbeeld `API_429`) en is `Balance` gelijk aan `"0.00"`.
+Bij een fout is `OperationResult` gelijk aan `FAILED`, bevat `ErrorCode` de foutcode (bijvoorbeeld `API_429`) en is `Balance` gelijk aan `"0.00"`. Het account meldt alleen saldi in USD en TRY; een opvraag in een andere valuta (EUR, GBP, ...) mislukt met `ErrorCode` = `BALANCE` en de melding `No EUR balance is reported for this account. Available: USD, TRY.`
 
 </details>
 
@@ -721,7 +728,7 @@ Bij een fout is `OperationResult` gelijk aan `FAILED`, bevat `ErrorCode` de fout
 
 #### DNS-zonebeheer
 
-De gateway slaat een zone op als record-**sets** (naam + type → waarden) en vervangt bij elke schrijfactie een volledige set. De methoden `*ResourceRecordSet` en `*ResourceRecordValue` regelen dat voor u. Namen kunnen relatief zijn (`www`), de apex (`@`, `""` of `example.com`) of volledig gekwalificeerd (`www.example.com.`). Ondersteunde typen: `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. Schrijfacties worden direct doorgevoerd, tenzij u `apply: false` meegeeft en zelf `ApplyResourceRecords` aanroept. Opeenvolgende zone-aanroepen worden minstens één seconde uit elkaar gehouden, omdat de gateway op snelle reeksen aanroepen antwoordt met HTTP 429.
+De gateway slaat een zone op als record-**sets** (naam + type → waarden) en vervangt bij elke schrijfactie een volledige set. De methoden `*ResourceRecordSet` en `*ResourceRecordValue` regelen dat voor u. Namen kunnen relatief zijn (`www`), de apex (`@`, `""` of `example.com`) of volledig gekwalificeerd (`www.example.com.`). Ondersteunde typen: `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. Schrijfacties worden direct doorgevoerd, tenzij u `apply: false` meegeeft en zelf `ApplyResourceRecords` aanroept; als dat automatisch doorvoeren mislukt, geeft de methode de fout van het doorvoeren terug (de wijziging blijft klaargezet en is niet live). Opeenvolgende zone-aanroepen worden minstens één seconde uit elkaar gehouden, omdat de gateway op snelle reeksen aanroepen antwoordt met HTTP 429.
 
 ```csharp
 // List every record (one row per value; names are fully qualified)
@@ -767,7 +774,7 @@ dna.ApplyResourceRecords("example.com");
 }
 ```
 
-`SetResourceRecordSet` / `AddResourceRecordValue`:
+`SetResourceRecordSet` / `AddResourceRecordValue` (het type wordt in hoofdletters gemeld en de TTL zoals verzonden, begrensd tot 1–86400 seconden):
 
 ```json
 { "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
@@ -798,7 +805,9 @@ dna.DeleteForwarding("example.com");
 { "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
 ```
 
-Als er geen doorsturing is ingesteld, geeft `GetForwarding` het volgende terug: `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`.
+Als er geen doorsturing is ingesteld (de gateway antwoordt met `Redirect information not found`), geeft `GetForwarding` het volgende terug: `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`. Elke andere fout — bijvoorbeeld een domein dat niet bestaat — wordt als fout teruggegeven.
+
+`DeleteForwarding` geeft `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}` terug; als er niets was ingesteld, doet de aanroep niets en antwoordt hij met `"Removed": false`.
 
 </details>
 
@@ -842,7 +851,8 @@ Bij API- of netwerkproblemen gooien de methoden nooit een exceptie; in plaats da
   "error": {
     "Code": "API_404",
     "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again."
+    "Details": "The domain could not be found. Please check and try again.",
+    "GatewayCode": "Dna.DomainService:Domain:10007"
   }
 }
 ```
@@ -852,12 +862,13 @@ Bij API- of netwerkproblemen gooien de methoden nooit een exceptie; in plaats da
 | HTTP-fout van de gateway | `API_<status>`, bijv. `API_400`, `API_429`, `API_500` | de melding van de gateway; bij een lege body `HTTP 429 - Too Many Requests` |
 | Onjuiste inloggegevens (HTTP 301/302) | `API_302` | `Invalid API credentials` |
 | Validatiefouten | `API_400` | de melding van de gateway; `Details` somt de velden op, bijv. `Admin PostalCode - 'PostalCode' is required` |
-| Time-out | `API_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| Overige netwerkfouten (DNS, verbinden, TLS, verbroken verbinding) | `API_6`, `API_7`, `API_60`, `API_56` | `Curl error during request: ...` |
+| Time-out | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
+| Overige netwerkfouten (DNS, verbinden, TLS, verbroken verbinding) | `CURL_6`, `CURL_7`, `CURL_60`, `CURL_56` | `Curl error during request: ...` |
+| Registratie, verlenging of transfer geweigerd (`"success": false`) | `REGISTER_DOMAIN`, `RENEW_DOMAIN`, `TRANSFER_DOMAIN` | de melding van de gateway |
 | Leeg of onbruikbaar succesantwoord | `RESPONSE` | `Invalid response received from server! Response is empty.` |
 | Controles vóór de aanroep van de gateway | bijv. `AVAILABILITY`, `ADD_ZONE`, `SET_FORWARD` | een beschrijving van het probleem |
 
-De numerieke netwerkcodes volgen de nummering van libcurl, zodat ze overeenkomen met php-dna. Alleen programmeerfouten (bijvoorbeeld het meegeven van een niet-ondersteund objecttype) kunnen een exceptie veroorzaken.
+`API_<n>`-codes staan altijd voor een HTTP-status. Als de gateway een eigen foutcode heeft meegestuurd, bevat de envelop die ook als `GatewayCode` (bijvoorbeeld `Dna.DomainService:Domain:10007`), zodat u "domein niet gevonden" kunt onderscheiden van "TLD niet ondersteund" zonder de melding te ontleden. Netwerkfouten gebruiken `CURL_<n>`, waarbij het nummer de nummering van libcurl volgt, zodat de codes overeenkomen met php-dna. Alleen programmeerfouten (bijvoorbeeld het meegeven van een niet-ondersteund objecttype) kunnen een exceptie veroorzaken.
 
 Voor het oplossen van problemen kan de laatste aanroep worden bekeken:
 
@@ -894,7 +905,7 @@ Wanneer een API-aanroep mislukt, kan de bibliotheek een foutrapport sturen naar 
 
 **Waarom en hoe lang:** de gegevens worden uitsluitend gebruikt voor gebruiksmeting en het vroegtijdig opsporen van problemen, en worden 30 dagen bewaard op de eigen Sentry-server van DomainNameAPI, waarna ze automatisch worden verwijderd.
 
-Rapporten worden op de achtergrond verzonden: ze blokkeren of vertragen uw aanroep nooit en veroorzaken nooit een exceptie. Verwachte fouten die vaak voorkomen (domein niet gevonden, onvoldoende saldo, ongeldige inloggegevens, ...) worden niet gerapporteerd.
+Rapporten worden op de achtergrond verzonden: ze blokkeren of vertragen uw aanroep nooit en veroorzaken nooit een exceptie. Verwachte fouten die vaak voorkomen (domein niet gevonden, onvoldoende saldo, ongeldige inloggegevens, geen doorsturing ingesteld, ...) worden niet gerapporteerd.
 
 **Zo schakelt u het uit:** roep na het aanmaken van de client `SetErrorReportingEnabled(false)` aan:
 
@@ -945,7 +956,7 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet t
 
 | Testbestand | Beschrijving |
 |-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | Speelt alle 126 conformiteitsfixtures van php-dna (`testdata/conformance/`) af en vergelijkt verzoeken en resultaten |
+| `tests/DomainNameApi.Tests/ConformanceTests.cs` | Speelt alle 134 conformiteitsfixtures van php-dna (`testdata/conformance/`) af en vergelijkt verzoeken en resultaten |
 | `tests/DomainNameApi.Tests/HttpLayerTests.cs` | Headers, URL's, querystrings, testmodus, time-outs, tempo van zone-aanroepen |
 | `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | Het standaardtransport op basis van `HttpClient` tegen een lokale listener |
 | `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | Vertaling van gatewayfouten en validatiemeldingen |

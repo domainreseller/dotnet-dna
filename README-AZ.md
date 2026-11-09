@@ -14,7 +14,7 @@
 
 DomainNameAPI reseller REST API-si üçün rəsmi .NET klienti: domen axtarışı, qeydiyyat, yenilənmə, transferlər, əlaqə məlumatları, nameserverlər, child nameserverlər, DNS zonaları və URL yönləndirmə.
 
-dotnet-dna [php-dna](https://github.com/domainreseller/php-dna) kitabxanasının dəqiq portudur: eyni metodlar, şəbəkəyə göndərilən eyni sorğular və eyni qaytarılan dəyərlər. O, php-dna-nın uyğunluq (conformance) ssenarilərinə (126 ssenari) qarşı yoxlanılır, buna görə də PHP kitabxanası ilə yazılmış kod birə-bir köçürülə bilər.
+dotnet-dna [php-dna](https://github.com/domainreseller/php-dna) kitabxanasının dəqiq portudur: eyni metodlar, şəbəkəyə göndərilən eyni sorğular və eyni qaytarılan dəyərlər. O, php-dna-nın uyğunluq (conformance) ssenarilərinə (134 ssenari) qarşı yoxlanılır, buna görə də PHP kitabxanası ilə yazılmış kod birə-bir köçürülə bilər.
 
 ## 📦 Yükləmə — həmişə Releases istifadə edin!
 
@@ -170,7 +170,7 @@ var result = dna.RegisterWithContactInfo(
     });
 ```
 
-Əlaqə məlumatları göndərilməzdən əvvəl tamamlanır: çatışmayan sahələrə yer tutucu dəyərlər verilir, adlardan rəqəmlər və durğu işarələri silinir, boş ştat/region sahəsi əvəzinə şəhər götürülür, ölkə adları ISO kodlarına çevrilir və telefon nömrələri nömrə və ölkə koduna ayrılır (bax: `ValidateContact`). Heç bir nameserver verilmədikdə (və ya yalnız boş dəyərlər verildikdə) `ns1.domainnameapi.com` və `ns2.domainnameapi.com` istifadə olunur. .tr domenləri üçün TRABIS atributları gateway-in qəbul etdiyi sahələrə endirilir (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`); köhnə `TRABISCITIZIENID` açarı və rəqəmsal kateqoriya avtomatik çevrilir.
+Əlaqə məlumatları göndərilməzdən əvvəl tamamlanır: çatışmayan sahələrə yer tutucu dəyərlər verilir, adlardan rəqəmlər və durğu işarələri silinir, çatışmayan və ya boş ştat/region sahəsi əvəzinə şəhər götürülür, ölkə adları ISO kodlarına çevrilir və telefon nömrələri nömrə və ölkə koduna ayrılır — öz `+` və ya `00` ölkə kodu ilə yazılmış nömrə həmin kodu saxlayır (bax: `ValidateContact`). Heç bir nameserver verilmədikdə (və ya yalnız boş dəyərlər verildikdə) `ns1.domainnameapi.com` və `ns2.domainnameapi.com` istifadə olunur. .tr domenləri üçün TRABIS atributları gateway-in qəbul etdiyi sahələrə endirilir (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`); köhnə `TRABISCITIZIENID` açarı və rəqəmsal kateqoriya avtomatik çevrilir.
 
 <details>
 <summary>Domen Qeydiyyatı üçün Nümunə Çıxış</summary>
@@ -202,6 +202,8 @@ var result = dna.RegisterWithContactInfo(
 
 </details>
 
+Gateway sifarişi rədd edərsə (`"success": false` cavabı verərsə), metod `Code` = `REGISTER_DOMAIN` və gateway-in mesajı olan xəta zərfi qaytarır; beləliklə, rədd edilmiş qeydiyyat heç vaxt tamamlanmış kimi göstərilmir. `Renew` (`RENEW_DOMAIN`) və `Transfer` (`TRANSFER_DOMAIN`) də eyni şəkildə davranır.
+
 <hr style="border: 4px solid #000; border-style: dashed;">
 
 #### Domen Yenilənməsi
@@ -227,7 +229,7 @@ var result = dna.Renew("example.com", 1);
 var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
 ```
 
-> ℹ️ php-dna-nın ümumi interfeysində olduğu kimi, `Transfer` boş əlaqə siyahısı göndərir; ixtiyari `contacts` parametri yalnız imza uyğunluğu üçün mövcuddur.
+> ℹ️ Transfer zamanı əlaqə məlumatları heç vaxt göndərilmir: sorğu həmişə boş əlaqə siyahısı daşıyır və əlaqə məlumatlarını qeydiyyatçı (registrar) özü təhvil alır. Buna görə də `Transfer` metodunun əlaqə parametri yoxdur; lazım olarsa, transfer tamamlandıqdan sonra əlaqə məlumatlarını `SaveContacts` ilə yeniləyin.
 
 <details>
 <summary>Domen Transferi üçün Nümunə Çıxış</summary>
@@ -558,8 +560,13 @@ var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.
 #### Domen Məxfiliyini Dəyişdirmək
 
 ```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true, "Owner request");
+var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
+
+// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
+var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
 ```
+
+İxtiyari üçüncü arqument (`reason`) yalnız uyğunluq üçün saxlanılıb; gateway-də belə sahə yoxdur və o göndərilmir.
 
 <details>
 <summary>Domen Məxfiliyini Dəyişdirmək üçün Nümunə Çıxış</summary>
@@ -677,12 +684,12 @@ var result = dna.GetResellerDetails();
   "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "active": true,
   "name": "Example Reseller",
-  "balance": "500",
+  "balance": "500.00",
   "currency": "USD",
   "symbol": "$",
   "balances": [
-    { "balance": "500", "currency": "USD", "symbol": "$" },
-    { "balance": "1500", "currency": "TL", "symbol": "TL" }
+    { "balance": "500.00", "currency": "USD", "symbol": "$" },
+    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
   ]
 }
 ```
@@ -713,7 +720,7 @@ var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
 }
 ```
 
-Uğursuzluq halında `OperationResult` dəyəri `FAILED` olur, `ErrorCode` xəta kodunu (məsələn, `API_429`) saxlayır və `Balance` dəyəri `"0.00"` olur.
+Uğursuzluq halında `OperationResult` dəyəri `FAILED` olur, `ErrorCode` xəta kodunu (məsələn, `API_429`) saxlayır və `Balance` dəyəri `"0.00"` olur. Hesab yalnız USD və TRY balanslarını bildirir; başqa valyuta (EUR, GBP, ...) tələb edildikdə `ErrorCode` = `BALANCE` və `No EUR balance is reported for this account. Available: USD, TRY.` mesajı ilə xəta qaytarılır.
 
 </details>
 
@@ -721,7 +728,7 @@ Uğursuzluq halında `OperationResult` dəyəri `FAILED` olur, `ErrorCode` xəta
 
 #### DNS Zonasının İdarə Edilməsi
 
-Gateway zonanı qeyd **dəstləri** (ad + tip → dəyərlər) kimi saxlayır və hər yazma əməliyyatında bütün dəsti əvəz edir. `*ResourceRecordSet` və `*ResourceRecordValue` metodları bunu sizin əvəzinizə həll edir. Adlar nisbi (`www`), kök domen (`@`, `""` və ya `example.com`) və ya tam ixtisaslı (`www.example.com.`) ola bilər. Dəstəklənən tiplər: `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. `apply: false` ötürüb `ApplyResourceRecords`-u özünüz çağırmadığınız halda yazma əməliyyatları dərhal tətbiq olunur. Ardıcıl zona çağırışları arasında ən azı bir saniyə fasilə saxlanılır, çünki gateway sıx gələn sorğulara HTTP 429 ilə cavab verir.
+Gateway zonanı qeyd **dəstləri** (ad + tip → dəyərlər) kimi saxlayır və hər yazma əməliyyatında bütün dəsti əvəz edir. `*ResourceRecordSet` və `*ResourceRecordValue` metodları bunu sizin əvəzinizə həll edir. Adlar nisbi (`www`), kök domen (`@`, `""` və ya `example.com`) və ya tam ixtisaslı (`www.example.com.`) ola bilər. Dəstəklənən tiplər: `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. `apply: false` ötürüb `ApplyResourceRecords`-u özünüz çağırmadığınız halda yazma əməliyyatları dərhal tətbiq olunur; bu avtomatik tətbiq uğursuz olarsa, metod tətbiq xətasını qaytarır (dəyişiklik hazırlanmış vəziyyətdə qalır, canlıya keçmir). Ardıcıl zona çağırışları arasında ən azı bir saniyə fasilə saxlanılır, çünki gateway sıx gələn sorğulara HTTP 429 ilə cavab verir.
 
 ```csharp
 // List every record (one row per value; names are fully qualified)
@@ -767,7 +774,7 @@ dna.ApplyResourceRecords("example.com");
 }
 ```
 
-`SetResourceRecordSet` / `AddResourceRecordValue`:
+`SetResourceRecordSet` / `AddResourceRecordValue` (tip böyük hərflərlə, TTL isə göndərildiyi kimi, 1–86400 saniyə ilə məhdudlaşdırılaraq göstərilir):
 
 ```json
 { "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
@@ -798,7 +805,9 @@ dna.DeleteForwarding("example.com");
 { "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
 ```
 
-Heç bir yönləndirmə qurulmadıqda `GetForwarding` `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}` qaytarır.
+Heç bir yönləndirmə qurulmadıqda (gateway `Redirect information not found` cavabı verir) `GetForwarding` `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}` qaytarır. Digər bütün xətalar — məsələn, mövcud olmayan domen — xəta kimi qaytarılır.
+
+`DeleteForwarding` `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}` qaytarır; heç nə qurulmayıbsa, heç bir dəyişiklik etmir və `"Removed": false` cavabını verir.
 
 </details>
 
@@ -842,7 +851,8 @@ Metodlar API və ya şəbəkə problemlərində heç vaxt istisna (exception) at
   "error": {
     "Code": "API_404",
     "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again."
+    "Details": "The domain could not be found. Please check and try again.",
+    "GatewayCode": "Dna.DomainService:Domain:10007"
   }
 }
 ```
@@ -852,12 +862,13 @@ Metodlar API və ya şəbəkə problemlərində heç vaxt istisna (exception) at
 | Gateway-dən gələn HTTP xətası | `API_<status>`, məs. `API_400`, `API_429`, `API_500` | gateway-in mesajı; boş cavab gövdəsi üçün `HTTP 429 - Too Many Requests` |
 | Yanlış API məlumatları (HTTP 301/302) | `API_302` | `Invalid API credentials` |
 | Validasiya xətaları | `API_400` | gateway-in mesajı; `Details` sahələri sadalayır, məs. `Admin PostalCode - 'PostalCode' is required` |
-| Vaxt aşımı (timeout) | `API_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| Digər şəbəkə xətaları (DNS, qoşulma, TLS, bağlantının qırılması) | `API_6`, `API_7`, `API_60`, `API_56` | `Curl error during request: ...` |
+| Vaxt aşımı (timeout) | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
+| Digər şəbəkə xətaları (DNS, qoşulma, TLS, bağlantının qırılması) | `CURL_6`, `CURL_7`, `CURL_60`, `CURL_56` | `Curl error during request: ...` |
+| Qeydiyyat, yenilənmə və ya transfer rədd edildi (`"success": false`) | `REGISTER_DOMAIN`, `RENEW_DOMAIN`, `TRANSFER_DOMAIN` | gateway-in mesajı |
 | Boş və ya yararsız uğurlu cavab | `RESPONSE` | `Invalid response received from server! Response is empty.` |
 | Gateway çağırılmazdan əvvəl edilən yoxlamalar | məs. `AVAILABILITY`, `ADD_ZONE`, `SET_FORWARD` | problemin təsviri |
 
-Rəqəmsal şəbəkə xəta kodları php-dna ilə uyğun gəlməsi üçün libcurl-un nömrələməsinə əsaslanır. Yalnız proqramlaşdırma xətaları (məsələn, dəstəklənməyən obyekt tipinin ötürülməsi) istisna ata bilər.
+`API_<n>` kodları həmişə HTTP statusunu bildirir. Gateway öz xəta kodunu göndərdikdə zərf onu `GatewayCode` kimi də daşıyır (məsələn, `Dna.DomainService:Domain:10007`), beləliklə mesajı təhlil etmədən "domen tapılmadı" ilə "TLD dəstəklənmir" hallarını bir-birindən ayıra bilərsiniz. Şəbəkə xətaları `CURL_<n>` kodundan istifadə edir; buradakı rəqəm kodların php-dna ilə uyğun gəlməsi üçün libcurl-un nömrələməsinə əsaslanır. Yalnız proqramlaşdırma xətaları (məsələn, dəstəklənməyən obyekt tipinin ötürülməsi) istisna ata bilər.
 
 Problemlərin aradan qaldırılması üçün sonuncu çağırışı yoxlamaq mümkündür:
 
@@ -894,7 +905,7 @@ API çağırışı uğursuz olduqda kitabxana DomainNameAPI-nin öz xəta izləm
 
 **Niyə və nə qədər müddətə:** məlumatlar yalnız istifadənin ölçülməsi və problemlərin erkən diaqnostikası üçün istifadə olunur, DomainNameAPI-nin öz Sentry serverində 30 gün saxlanılır, sonra avtomatik olaraq silinir.
 
-Hesabatlar arxa planda göndərilir: onlar heç vaxt çağırışınızı bloklamır, yavaşlatmır və istisna atmır. Gözlənilən, yüksək həcmli xətalar (domen tapılmadı, balans kifayət deyil, yanlış API məlumatları, ...) hesabata daxil edilmir.
+Hesabatlar arxa planda göndərilir: onlar heç vaxt çağırışınızı bloklamır, yavaşlatmır və istisna atmır. Gözlənilən, yüksək həcmli xətalar (domen tapılmadı, balans kifayət deyil, yanlış API məlumatları, qurulmuş yönləndirmənin olmaması, ...) hesabata daxil edilmir.
 
 **Necə söndürmək olar:** klienti yaratdıqdan sonra `SetErrorReportingEnabled(false)` çağırın:
 
@@ -945,7 +956,7 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet t
 
 | Test faylı | Açıqlama |
 |-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | php-dna-nın bütün 126 uyğunluq ssenarisini (`testdata/conformance/`) təkrar icra edir, sorğuları və nəticələri müqayisə edir |
+| `tests/DomainNameApi.Tests/ConformanceTests.cs` | php-dna-nın bütün 134 uyğunluq ssenarisini (`testdata/conformance/`) təkrar icra edir, sorğuları və nəticələri müqayisə edir |
 | `tests/DomainNameApi.Tests/HttpLayerTests.cs` | Başlıqlar, URL-lər, sorğu sətirləri (query string), test rejimi, vaxt aşımları, zona çağırışları arasındakı fasilə |
 | `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | Lokal dinləyiciyə qarşı standart `HttpClient` nəqliyyat qatı |
 | `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | Gateway xətalarının uyğunlaşdırılması və validasiya mesajları |
