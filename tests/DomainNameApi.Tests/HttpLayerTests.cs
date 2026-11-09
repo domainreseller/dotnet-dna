@@ -98,7 +98,8 @@ namespace DomainNameApi.Tests
             var r = c.ModifyNameServer("example.com", new[] { "ns1.example.com" });
 
             Assert.Equal("ERROR", (string)r["result"]);
-            Assert.Equal("API_28", (string)r["error"]["Code"]);
+            Assert.Equal("CURL_28", (string)r["error"]["Code"]);
+            Assert.Null(r["error"]["GatewayCode"]);
             var msg = "Could not reach the DomainNameAPI service: the connection timed out. (Operation timed out after 30000 milliseconds)";
             Assert.Equal(msg, (string)r["error"]["Message"]);
             Assert.Equal(msg, (string)r["error"]["Details"]);
@@ -111,7 +112,7 @@ namespace DomainNameApi.Tests
             var (c, t) = Make();
             t.EnqueueFailure(new TransportException(6, "Could not resolve host: api.domainresellerapi.com"));
             var r = c.GetDetails("example.com");
-            Assert.Equal("API_6", (string)r["error"]["Code"]);
+            Assert.Equal("CURL_6", (string)r["error"]["Code"]);
             Assert.Equal("Curl error during request: Could not resolve host: api.domainresellerapi.com", (string)r["error"]["Message"]);
         }
 

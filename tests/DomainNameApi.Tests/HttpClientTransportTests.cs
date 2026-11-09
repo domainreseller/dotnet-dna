@@ -125,7 +125,7 @@ namespace DomainNameApi.Tests
                 client.SetErrorReportingEnabled(false);
                 client.SetServiceUrl(server.BaseUrl + "api/v1");
                 var r = client.GetDetails("example.com");
-                Assert.Equal("API_28", (string)r["error"]["Code"]);
+                Assert.Equal("CURL_28", (string)r["error"]["Code"]);
                 Assert.StartsWith("Could not reach the DomainNameAPI service: the connection timed out.", (string)r["error"]["Message"]);
             }
         }
@@ -144,7 +144,7 @@ namespace DomainNameApi.Tests
                 client.SetServiceUrl("http://127.0.0.1:" + port + "/api/v1");
                 var r = client.EnableTheftProtectionLock("example.com");
                 Assert.Equal("ERROR", (string)r["result"]);
-                Assert.Equal("API_7", (string)r["error"]["Code"]);
+                Assert.Equal("CURL_7", (string)r["error"]["Code"]);
                 Assert.StartsWith("Curl error during request: ", (string)r["error"]["Message"]);
             }
         }

@@ -34,8 +34,8 @@ namespace DomainNameApi.Tests
             Assert.Equal("5323743388", (string)r["Phone"]);
             Assert.Equal("90", (string)r["PhoneCountryCode"]);
             Assert.Equal("DE", (string)r["Country"]);
-            // A missing State gets the default; only a present-but-blank State falls back to the city.
-            Assert.Equal("ISTANBUL", (string)r["State"]);
+            // A missing State falls back to the city.
+            Assert.Equal("Berlin", (string)r["State"]);
             Assert.Equal("", (string)r["Fax"]);
             Assert.Equal("", (string)r["FaxCountryCode"]);
         }
@@ -45,7 +45,9 @@ namespace DomainNameApi.Tests
         [InlineData("905323743388", "", "5323743388", "90")]
         [InlineData("905323743388", "90", "5323743388", "90")]
         [InlineData("+1 202 555 0100", "1", "2025550100", "1")]
-        [InlineData("0044 20 7123 4567", "", "442071234567", "90")]
+        [InlineData("0044 20 7123 4567", "", "2071234567", "44")]
+        [InlineData("+1 (202) 555-0100", "90", "2025550100", "1")]
+        [InlineData("+90 532 374 33 88", "90", "5323743388", "90")]
         [InlineData("", "44", "", "44")]
         public void NormalizePhone(string number, string cc, string expectedNumber, string expectedCc)
         {
@@ -53,6 +55,15 @@ namespace DomainNameApi.Tests
             Assert.Equal(expectedNumber, n);
             Assert.Equal(expectedCc, c);
         }
+
+        [Theory]
+        [InlineData("12025550100", "1")]
+        [InlineData("74951234567", "7")]
+        [InlineData("442071234567", "44")]
+        [InlineData("994501234567", "994")]
+        [InlineData("0123", "")]
+        [InlineData("", "")]
+        public void CallingCodePrefix(string digits, string expected) => Assert.Equal(expected, DomainNameApiClient.CallingCodePrefix(digits));
 
         [Theory]
         [InlineData("Şükrü Öztürk", "Şükrü Öztürk")]

@@ -65,14 +65,23 @@ namespace DomainNameApi.Tests
         }
 
         [Fact]
-        public void EchoedCodeWithNullDetailsFallsBackToRawBody()
+        public void EchoedCodeWithNullDetailsNeverUsesTheRawBody()
         {
-            // php-dna behaviour (see addChildNameServer.error fixture): a null `details`
-            // falls back to the raw body, which then replaces the echoed code.
-            const string body = "{\"error\":{\"code\":\"Dna.X:1\",\"message\":\"Dna.X:1\",\"details\":null}}";
-            var r = Call(400, body);
-            Assert.Equal(body, (string)r["error"]["Message"]);
-            Assert.Equal(body, (string)r["error"]["Details"]);
+            var r = Call(400, "{\"error\":{\"code\":\"Dna.X:1\",\"message\":\"Dna.X:1\",\"details\":null}}");
+            Assert.Equal("The operation could not be completed by the registry (error: Dna.X:1). Please try again or contact support.", (string)r["error"]["Message"]);
+            Assert.Equal("Dna.X:1", (string)r["error"]["GatewayCode"]);
+        }
+
+        [Fact]
+        public void GatewayCodeIsKeptNextToTheStatusCode()
+        {
+            var r = Call(404, "{\"error\":{\"code\":\"Dna.DomainService:Domain:10007\",\"message\":\"Not here\"}}");
+            Assert.Equal("API_404", (string)r["error"]["Code"]);
+            Assert.Equal("Dna.DomainService:Domain:10007", (string)r["error"]["GatewayCode"]);
+
+            // No gateway code (empty body, redirect): no GatewayCode key.
+            Assert.Null(Call(500, "")["error"]["GatewayCode"]);
+            Assert.Null(Call(302, "")["error"]["GatewayCode"]);
         }
 
         [Fact]
@@ -98,6 +107,21 @@ namespace DomainNameApi.Tests
         public void HumanizeValidationMember(string member, string expected)
         {
             Assert.Equal(expected, DomainNameApiClient.HumanizeValidationMember(member));
+        }
+
+        [Fact]
+        public void SuccessFalseIsARefusal()
+        {
+            var t = new FakeTransport().Enqueue(200, "{\"success\":false,\"message\":\"Domain is not available\"}").Enqueue(200, "{\"success\":false}");
+            var c = new DomainNameApiClient("r", "k", false, t);
+            c.SetErrorReportingEnabled(false);
+            var r = c.Renew("example.com", 1);
+            Assert.Equal("RENEW_DOMAIN", (string)r["error"]["Code"]);
+            Assert.Equal("Domain is not available", (string)r["error"]["Message"]);
+            r = c.Transfer("example.com", "code", 1);
+            Assert.Equal("TRANSFER_DOMAIN", (string)r["error"]["Code"]);
+            Assert.Equal("The registry did not accept the request.", (string)r["error"]["Message"]);
+            Assert.Equal("[]", t.Requests[1].Body.Substring(t.Requests[1].Body.IndexOf("\"contacts\":", System.StringComparison.Ordinal) + 11, 2));
         }
 
         [Fact]

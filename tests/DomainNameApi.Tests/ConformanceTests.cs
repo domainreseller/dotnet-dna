@@ -26,7 +26,7 @@ namespace DomainNameApi.Tests
         [Fact]
         public void AllFixturesArePresent()
         {
-            Assert.Equal(126, Directory.GetFiles(FixtureDir, "*.json").Length);
+            Assert.Equal(134, Directory.GetFiles(FixtureDir, "*.json").Length);
         }
 
         [Theory]
@@ -141,7 +141,9 @@ namespace DomainNameApi.Tests
                 case "modifyNameServer": return c.ModifyNameServer(S(0), Arg(1));
                 case "enableTheftProtectionLock": return c.EnableTheftProtectionLock(S(0));
                 case "disableTheftProtectionLock": return c.DisableTheftProtectionLock(S(0));
-                case "modifyPrivacyProtectionStatus": return Has(2) ? c.ModifyPrivacyProtectionStatus(S(0), B(1), S(2)) : c.ModifyPrivacyProtectionStatus(S(0), B(1));
+                case "modifyPrivacyProtectionStatus":
+                    if (Arg(1) is string flag) return Has(2) ? c.ModifyPrivacyProtectionStatus(S(0), flag, S(2)) : c.ModifyPrivacyProtectionStatus(S(0), flag);
+                    return Has(2) ? c.ModifyPrivacyProtectionStatus(S(0), B(1), S(2)) : c.ModifyPrivacyProtectionStatus(S(0), B(1));
                 case "renew": return c.Renew(S(0), I(1));
                 case "registerWithContactInfo":
                     return c.RegisterWithContactInfo(S(0), I(1), Map(2),
@@ -152,7 +154,8 @@ namespace DomainNameApi.Tests
                 case "addChildNameServer": return c.AddChildNameServer(S(0), S(1), S(2));
                 case "deleteChildNameServer": return c.DeleteChildNameServer(S(0), S(1));
                 case "modifyChildNameServer": return c.ModifyChildNameServer(S(0), S(1), S(2));
-                case "transfer": return c.Transfer(S(0), S(1), I(2), Has(3) ? Map(3) : null);
+                // A 4th (contacts) argument is ignored: transfers never send contacts.
+                case "transfer": return c.Transfer(S(0), S(1), I(2));
                 case "cancelTransfer": return c.CancelTransfer(S(0));
                 case "approveTransfer": return c.ApproveTransfer(S(0));
                 case "rejectTransfer": return c.RejectTransfer(S(0));
