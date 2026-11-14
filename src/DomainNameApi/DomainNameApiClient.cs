@@ -25,7 +25,7 @@ namespace DomainNameApi
     public sealed partial class DomainNameApiClient : IDisposable
     {
         /// <summary>Library version.</summary>
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
 
         /// <summary>User-Agent sent with every gateway request (Cloudflare rejects default client agents).</summary>
         public const string UserAgent = "DomainNameAPI-DotNet/" + Version;

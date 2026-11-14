@@ -20,9 +20,40 @@ namespace DomainNameApi.Tests
         }
 
         [Fact]
-        public void DefaultDsnIsEmptyAndTelemetryIsANoOp()
+        public void DefaultDsnIsTheDotnetDnaSentryProject()
         {
-            Assert.Equal("", DomainNameApiClient.DefaultSentryDsn);
+            Assert.Equal("https://b98d4a4f7be210aa3d95b0065c5ee0cf@sentry.atakdomain.com/20", DomainNameApiClient.DefaultSentryDsn);
+            using (var c = new DomainNameApiClient("r", "k", false, new FakeTransport()))
+            {
+                Assert.Equal(DomainNameApiClient.DefaultSentryDsn, c.TelemetryDsn);
+            }
+        }
+
+        [Fact]
+        public void TestRunNeverPostsToTheRealSentryProject()
+        {
+            // Installed by TelemetryTestGuard before any test runs.
+            Assert.Same(TelemetryTestGuard.DropEvent, DomainNameApiClient.DefaultTelemetrySender);
+            using (var c = new DomainNameApiClient("r", "k", false, new FakeTransport()))
+            {
+                Assert.Same(TelemetryTestGuard.DropEvent, c.TelemetrySender);
+            }
+        }
+
+        [Fact]
+        public void DefaultDsnBuildsEventsForTheDotnetDnaProject()
+        {
+            var (c, t, sent) = Make(DomainNameApiClient.DefaultSentryDsn);
+            t.Enqueue(500, "{\"error\":{\"message\":\"boom\"}}");
+            c.GetDetails("example.com");
+            Assert.Single(sent);
+            Assert.Equal("https://sentry.atakdomain.com/api/20/store/", sent[0].Url);
+            Assert.Equal("Sentry sentry_version=7, sentry_client=dotnet-dna/1.0.1, sentry_key=b98d4a4f7be210aa3d95b0065c5ee0cf", sent[0].Auth);
+        }
+
+        [Fact]
+        public void EmptyDsnIsANoOp()
+        {
             var (c, t, sent) = Make("");
             t.Enqueue(500, "{\"error\":{\"message\":\"boom\"}}");
             c.GetDetails("example.com");
@@ -39,12 +70,12 @@ namespace DomainNameApi.Tests
             Assert.Single(sent);
             var (url, body, auth) = sent[0];
             Assert.Equal("https://sentry.example.test/api/42/store/", url);
-            Assert.Equal("Sentry sentry_version=7, sentry_client=dotnet-dna/1.0.0, sentry_key=publickey", auth);
+            Assert.Equal("Sentry sentry_version=7, sentry_client=dotnet-dna/1.0.1, sentry_key=publickey", auth);
 
             var evt = JsonNode.Parse(body);
             Assert.Equal("DomainNameAPI-DotNet", (string)evt["tags"]["application"]);
-            Assert.Equal("1.0.0", (string)evt["tags"]["library_version"]);
-            Assert.Equal("1.0.0", (string)evt["release"]);
+            Assert.Equal("1.0.1", (string)evt["tags"]["library_version"]);
+            Assert.Equal("1.0.1", (string)evt["release"]);
             Assert.Equal("production", (string)evt["environment"]);
             Assert.Equal("00000000-0000-4000-8000-000000000001", (string)evt["tags"]["reseller"]);
             Assert.Equal("example.com", (string)evt["tags"]["domain"]);

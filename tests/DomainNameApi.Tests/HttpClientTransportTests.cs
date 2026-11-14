@@ -92,7 +92,7 @@ namespace DomainNameApi.Tests
                 Assert.Equal("POST", seenMethod);
                 Assert.Equal("reseller", seenReseller);
                 Assert.Equal("key", seenKey);
-                Assert.Equal("DomainNameAPI-DotNet/1.0.0", seenAgent);
+                Assert.Equal("DomainNameAPI-DotNet/1.0.1", seenAgent);
                 Assert.Equal("application/json", seenType);
                 Assert.Equal("{\"domainName\":\"example.com\"}", seenBody);
             }

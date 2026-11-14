@@ -888,8 +888,6 @@ dna.GetParsedResponseData(); // parsed response or the error built from it
 
 当 API 调用失败时，本库可以向 DomainNameAPI 自己的错误跟踪系统（Sentry）发送错误报告。成功调用中的一小部分随机样本（4%，以及所有耗时超过 1 秒的调用）可能会作为性能记录发送。这有助于 DomainNameAPI 发现并修复问题。错误报告**默认开启**。
 
-> ℹ️ 在 1.0.0 版本中，Sentry 地址（`DefaultSentryDsn`）仍为空，因为 .NET 库的 Sentry 项目尚未创建。在某个发布版本填入该地址之前，**不会发送任何内容**。以下行为描述的是设置该地址后将发送的内容。
-
 **发送的内容：**
 
 - 错误代码和消息
@@ -925,7 +923,7 @@ dna.SetErrorReportingEnabled(false);
 - **超时：** 每个请求 30 秒，连接 10 秒；可通过 `Timeout` 和 `ConnectTimeout` 属性修改。
 - **自定义传输层：** 向构造函数传入 `IHttpTransport`（`new DomainNameApiClient(id, key, false, transport)`）或设置 `Transport` 属性，即可通过您自己的 HTTP 栈、代理或测试替身（test double）发送请求。实现需要返回所有 HTTP 状态（不跟随重定向），并在网络故障时抛出 `TransportException`。
 - **线程：** 客户端会保留最近一次的请求和响应以便诊断，因此不是线程安全的。请为每个线程（或每个请求）使用一个实例，或对访问进行同步。`Dispose()` 会释放底层的 `HttpClient`。
-- **User-Agent：** 请求以 `DomainNameAPI-DotNet/1.0.0` 的身份发送。
+- **User-Agent：** 请求以 `DomainNameAPI-DotNet/1.0.1` 的身份发送。
 
 ### 示例
 

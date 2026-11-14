@@ -888,8 +888,6 @@ Pass `true` as the third constructor argument to use the OTE test environment (`
 
 When an API call fails, the library can send an error report to DomainNameAPI's own error tracker (Sentry). A small random share of successful calls (4%, plus every call slower than 1 second) can be sent as a performance record. This helps DomainNameAPI find and fix problems. Error reporting is **on by default**.
 
-> ℹ️ In version 1.0.0 the Sentry address (`DefaultSentryDsn`) is still empty, because the Sentry project for the .NET library has not been created yet. Until a release fills it in, **nothing is sent**. The behaviour below describes what is sent once it is set.
-
 **What is sent:**
 
 - error code and message
@@ -925,7 +923,7 @@ The destination can be changed with the `TelemetryDsn` property (for example to 
 - **Timeouts:** 30 seconds per request and 10 seconds to connect; change them with the `Timeout` and `ConnectTimeout` properties.
 - **Custom transport:** pass an `IHttpTransport` to the constructor (`new DomainNameApiClient(id, key, false, transport)`) or set the `Transport` property to route requests through your own HTTP stack, a proxy or a test double. Implementations return every HTTP status (redirects are not followed) and throw `TransportException` for network failures.
 - **Threads:** a client keeps the last request and response for diagnostics and is not thread-safe. Use one instance per thread (or per request) or synchronise access. `Dispose()` releases the underlying `HttpClient`.
-- **User-Agent:** requests are sent as `DomainNameAPI-DotNet/1.0.0`.
+- **User-Agent:** requests are sent as `DomainNameAPI-DotNet/1.0.1`.
 
 ### Examples
 

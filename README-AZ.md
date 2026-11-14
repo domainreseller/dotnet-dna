@@ -888,8 +888,6 @@ Canlı mühit (`https://api.domainresellerapi.com/api/v1`) əvəzinə OTE test m
 
 API çağırışı uğursuz olduqda kitabxana DomainNameAPI-nin öz xəta izləmə sisteminə (Sentry) xəta hesabatı göndərə bilər. Uğurlu çağırışların təsadüfi seçilmiş kiçik bir hissəsi (4%, üstəlik 1 saniyədən uzun çəkən hər çağırış) performans qeydi kimi göndərilə bilər. Bu, DomainNameAPI-yə problemləri tapıb düzəltməyə kömək edir. Xəta hesabatları **standart olaraq aktivdir**.
 
-> ℹ️ 1.0.0 versiyasında Sentry ünvanı (`DefaultSentryDsn`) hələ boşdur, çünki .NET kitabxanası üçün Sentry layihəsi hələ yaradılmayıb. Hansısa buraxılış bu ünvanı doldurana qədər **heç nə göndərilmir**. Aşağıdakı davranış ünvan təyin edildikdən sonra nələrin göndəriləcəyini təsvir edir.
-
 **Göndərilənlər:**
 
 - xəta kodu və mesajı
@@ -925,7 +923,7 @@ Təyinat ünvanı `TelemetryDsn` xassəsi ilə dəyişdirilə bilər (məsələn
 - **Vaxt aşımları:** hər sorğu üçün 30 saniyə, qoşulma üçün 10 saniyə; `Timeout` və `ConnectTimeout` xassələri ilə dəyişdirilə bilər.
 - **Fərdi nəqliyyat qatı (transport):** sorğuları öz HTTP stekiniz, proksi və ya test əvəzedicisi (test double) vasitəsilə yönləndirmək üçün constructor-a `IHttpTransport` ötürün (`new DomainNameApiClient(id, key, false, transport)`) və ya `Transport` xassəsini təyin edin. İmplementasiyalar bütün HTTP status kodlarını qaytarır (yönləndirmələrə əməl edilmir) və şəbəkə xətalarında `TransportException` atır.
 - **Axınlar (thread):** klient diaqnostika üçün sonuncu sorğu və cavabı saxlayır və thread-safe deyil. Hər axın (və ya hər sorğu) üçün ayrıca nüsxə istifadə edin, yaxud girişi sinxronlaşdırın. `Dispose()` daxili `HttpClient`-i azad edir.
-- **User-Agent:** sorğular `DomainNameAPI-DotNet/1.0.0` kimi göndərilir.
+- **User-Agent:** sorğular `DomainNameAPI-DotNet/1.0.1` kimi göndərilir.
 
 ### Nümunələr
 

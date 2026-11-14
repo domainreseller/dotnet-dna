@@ -888,8 +888,6 @@ dna.GetParsedResponseData(); // parsed response or the error built from it
 
 Wenn ein API-Aufruf fehlschlägt, kann die Bibliothek einen Fehlerbericht an den eigenen Fehler-Tracker von DomainNameAPI (Sentry) senden. Ein kleiner, zufällig gewählter Anteil erfolgreicher Aufrufe (4 %, dazu jeder Aufruf, der länger als 1 Sekunde dauert) kann als Performance-Datensatz gesendet werden. Das hilft DomainNameAPI, Probleme zu finden und zu beheben. Fehlerberichte sind **standardmäßig aktiviert**.
 
-> ℹ️ In Version 1.0.0 ist die Sentry-Adresse (`DefaultSentryDsn`) noch leer, da das Sentry-Projekt für die .NET-Bibliothek noch nicht angelegt wurde. Bis ein Release sie einträgt, wird **nichts gesendet**. Das folgende Verhalten beschreibt, was gesendet wird, sobald sie gesetzt ist.
-
 **Was gesendet wird:**
 
 - Fehlercode und -meldung
@@ -925,7 +923,7 @@ Das Ziel lässt sich über die Eigenschaft `TelemetryDsn` ändern (zum Beispiel 
 - **Timeouts:** 30 Sekunden pro Anfrage und 10 Sekunden für den Verbindungsaufbau; ändern Sie sie über die Eigenschaften `Timeout` und `ConnectTimeout`.
 - **Eigener Transport:** Übergeben Sie dem Konstruktor einen `IHttpTransport` (`new DomainNameApiClient(id, key, false, transport)`) oder setzen Sie die Eigenschaft `Transport`, um Anfragen über Ihren eigenen HTTP-Stack, einen Proxy oder ein Test-Double zu leiten. Implementierungen geben jeden HTTP-Status zurück (Weiterleitungen werden nicht verfolgt) und lösen bei Netzwerkfehlern eine `TransportException` aus.
 - **Threads:** Ein Client speichert die letzte Anfrage und Antwort zu Diagnosezwecken und ist nicht threadsicher. Verwenden Sie eine Instanz pro Thread (oder pro Anfrage) oder synchronisieren Sie den Zugriff. `Dispose()` gibt den zugrunde liegenden `HttpClient` frei.
-- **User-Agent:** Anfragen werden als `DomainNameAPI-DotNet/1.0.0` gesendet.
+- **User-Agent:** Anfragen werden als `DomainNameAPI-DotNet/1.0.1` gesendet.
 
 ### Beispiele
 

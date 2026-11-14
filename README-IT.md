@@ -888,8 +888,6 @@ Passa `true` come terzo argomento del costruttore per usare l'ambiente di test O
 
 Quando una chiamata API fallisce, la libreria può inviare una segnalazione di errore al sistema di tracciamento errori di DomainNameAPI (Sentry). Una piccola quota casuale delle chiamate riuscite (4%, più ogni chiamata che dura oltre 1 secondo) può essere inviata come record di prestazioni. Questo aiuta DomainNameAPI a individuare e risolvere i problemi. La segnalazione errori è **attiva per impostazione predefinita**.
 
-> ℹ️ Nella versione 1.0.0 l'indirizzo Sentry (`DefaultSentryDsn`) è ancora vuoto, perché il progetto Sentry per la libreria .NET non è ancora stato creato. Finché una release non lo imposta, **non viene inviato nulla**. Il comportamento descritto di seguito indica cosa verrà inviato una volta impostato.
-
 **Cosa viene inviato:**
 
 - codice e messaggio di errore
@@ -925,7 +923,7 @@ La destinazione può essere modificata con la proprietà `TelemetryDsn` (ad esem
 - **Timeout:** 30 secondi per richiesta e 10 secondi per la connessione; modificali con le proprietà `Timeout` e `ConnectTimeout`.
 - **Transport personalizzato:** passa un `IHttpTransport` al costruttore (`new DomainNameApiClient(id, key, false, transport)`) o imposta la proprietà `Transport` per instradare le richieste attraverso il tuo stack HTTP, un proxy o un test double. Le implementazioni restituiscono ogni stato HTTP (i redirect non vengono seguiti) e generano `TransportException` in caso di errori di rete.
 - **Thread:** un client conserva l'ultima richiesta e l'ultima risposta a fini diagnostici e non è thread-safe. Usa un'istanza per thread (o per richiesta) oppure sincronizza l'accesso. `Dispose()` rilascia l'`HttpClient` sottostante.
-- **User-Agent:** le richieste vengono inviate come `DomainNameAPI-DotNet/1.0.0`.
+- **User-Agent:** le richieste vengono inviate come `DomainNameAPI-DotNet/1.0.1`.
 
 ### Esempi
 

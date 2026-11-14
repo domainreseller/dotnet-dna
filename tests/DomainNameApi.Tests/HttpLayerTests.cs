@@ -27,7 +27,7 @@ namespace DomainNameApi.Tests
             Assert.Equal("https://api.domainresellerapi.com/api/v1/deposit/accounts/me", req.Url);
             Assert.Equal("key", req.Headers["X-API-KEY"]);
             Assert.Equal("reseller-id", req.Headers["__reseller"]);
-            Assert.Equal("DomainNameAPI-DotNet/1.0.0", req.Headers["User-Agent"]);
+            Assert.Equal("DomainNameAPI-DotNet/1.0.1", req.Headers["User-Agent"]);
             Assert.Equal("application/json", req.Headers["Accept"]);
             Assert.Equal("application/json", req.Headers["Content-Type"]);
             Assert.Null(req.Body);

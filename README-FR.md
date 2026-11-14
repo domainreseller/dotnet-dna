@@ -888,8 +888,6 @@ Passez `true` comme troisième argument du constructeur pour utiliser l'environn
 
 Lorsqu'un appel API échoue, la bibliothèque peut envoyer un rapport d'erreur au système de suivi des erreurs propre à DomainNameAPI (Sentry). Une petite part aléatoire des appels réussis (4 %, plus chaque appel de plus d'une seconde) peut être envoyée comme enregistrement de performance. Cela aide DomainNameAPI à trouver et corriger les problèmes. Les rapports d'erreurs sont **activés par défaut**.
 
-> ℹ️ Dans la version 1.0.0, l'adresse Sentry (`DefaultSentryDsn`) est encore vide, car le projet Sentry de la bibliothèque .NET n'a pas encore été créé. Tant qu'une release ne l'a pas renseignée, **rien n'est envoyé**. Le comportement décrit ci-dessous correspond à ce qui sera envoyé une fois l'adresse définie.
-
 **Ce qui est envoyé :**
 
 - le code et le message d'erreur
@@ -925,7 +923,7 @@ La destination peut être modifiée avec la propriété `TelemetryDsn` (par exem
 - **Délais d'attente :** 30 secondes par requête et 10 secondes pour la connexion ; modifiez-les avec les propriétés `Timeout` et `ConnectTimeout`.
 - **Transport personnalisé :** transmettez un `IHttpTransport` au constructeur (`new DomainNameApiClient(id, key, false, transport)`) ou définissez la propriété `Transport` pour faire passer les requêtes par votre propre pile HTTP, un proxy ou un double de test. Les implémentations renvoient tous les statuts HTTP (les redirections ne sont pas suivies) et lèvent `TransportException` en cas de défaillance réseau.
 - **Threads :** un client conserve la dernière requête et la dernière réponse à des fins de diagnostic et n'est pas thread-safe. Utilisez une instance par thread (ou par requête) ou synchronisez les accès. `Dispose()` libère le `HttpClient` sous-jacent.
-- **User-Agent :** les requêtes sont envoyées avec `DomainNameAPI-DotNet/1.0.0`.
+- **User-Agent :** les requêtes sont envoyées avec `DomainNameAPI-DotNet/1.0.1`.
 
 ### Exemples
 

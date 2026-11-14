@@ -19,10 +19,11 @@ namespace DomainNameApi
     public sealed partial class DomainNameApiClient
     {
         /// <summary>
-        /// Sentry DSN for the .NET library. Empty until the Sentry project exists;
-        /// it is filled in then. With an empty DSN telemetry is a no-op.
+        /// DomainNameAPI's Sentry project for dotnet-dna. Error and performance
+        /// reports go here by default; call <see cref="SetErrorReportingEnabled"/>(false)
+        /// to turn telemetry off.
         /// </summary>
-        public const string DefaultSentryDsn = "";
+        public const string DefaultSentryDsn = "https://b98d4a4f7be210aa3d95b0065c5ee0cf@sentry.atakdomain.com/20";
 
         /// <summary>Successful calls sampled for performance metrics, per 1000 (4%).</summary>
         public const int PerformanceSampleRate = 40;
@@ -54,7 +55,13 @@ namespace DomainNameApi
         /// Delivery of an encoded Sentry event: (store URL, JSON body, X-Sentry-Auth header).
         /// Replaceable for tests; the default posts in the background and never blocks or throws.
         /// </summary>
-        internal Action<string, string, string> TelemetrySender { get; set; } = FireAndForgetPost;
+        internal Action<string, string, string> TelemetrySender { get; set; } = DefaultTelemetrySender;
+
+        /// <summary>
+        /// Sender every new client starts with. Test-only seam: the test assembly
+        /// replaces it so that no test run can post to the real Sentry project.
+        /// </summary>
+        internal static Action<string, string, string> DefaultTelemetrySender = FireAndForgetPost;
 
         /// <summary>Turn error and performance reporting on or off (on by default).</summary>
         public void SetErrorReportingEnabled(bool enabled) => _errorReportingEnabled = enabled;

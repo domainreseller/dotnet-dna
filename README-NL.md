@@ -888,8 +888,6 @@ Geef `true` mee als derde constructorargument om de OTE-testomgeving (`https://o
 
 Wanneer een API-aanroep mislukt, kan de bibliotheek een foutrapport sturen naar de eigen fouttracker van DomainNameAPI (Sentry). Een klein, willekeurig gekozen deel van de geslaagde aanroepen (4%, plus elke aanroep die langer dan 1 seconde duurt) kan als prestatierecord worden verzonden. Dit helpt DomainNameAPI problemen op te sporen en op te lossen. Foutrapportage staat **standaard aan**.
 
-> ℹ️ In versie 1.0.0 is het Sentry-adres (`DefaultSentryDsn`) nog leeg, omdat het Sentry-project voor de .NET-bibliotheek nog niet is aangemaakt. Totdat een release het invult, wordt er **niets verzonden**. Het onderstaande gedrag beschrijft wat er wordt verzonden zodra het is ingesteld.
-
 **Wat er wordt verzonden:**
 
 - foutcode en -melding
@@ -925,7 +923,7 @@ De bestemming kan worden gewijzigd met de eigenschap `TelemetryDsn` (bijvoorbeel
 - **Time-outs:** 30 seconden per verzoek en 10 seconden om verbinding te maken; wijzig ze met de eigenschappen `Timeout` en `ConnectTimeout`.
 - **Eigen transport:** geef een `IHttpTransport` mee aan de constructor (`new DomainNameApiClient(id, key, false, transport)`) of stel de eigenschap `Transport` in om verzoeken via uw eigen HTTP-stack, een proxy of een test double te laten lopen. Implementaties geven elke HTTP-status terug (redirects worden niet gevolgd) en gooien een `TransportException` bij netwerkfouten.
 - **Threads:** een client bewaart het laatste verzoek en antwoord voor diagnose en is niet thread-safe. Gebruik één instantie per thread (of per verzoek) of synchroniseer de toegang. `Dispose()` geeft de onderliggende `HttpClient` vrij.
-- **User-Agent:** verzoeken worden verzonden als `DomainNameAPI-DotNet/1.0.0`.
+- **User-Agent:** verzoeken worden verzonden als `DomainNameAPI-DotNet/1.0.1`.
 
 ### Voorbeelden
 
