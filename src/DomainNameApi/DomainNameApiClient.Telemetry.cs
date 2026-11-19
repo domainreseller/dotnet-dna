@@ -402,7 +402,9 @@ namespace DomainNameApi
         {
             var frames = new JsonArray();
             var trace = new StackTrace(2, true).GetFrames() ?? Array.Empty<StackFrame>();
-            foreach (var f in trace.Reverse())
+            // Enumerable.Reverse explicitly: with C# 14 on netstandard2.0, trace.Reverse() binds to the in-place
+            // MemoryExtensions.Reverse(Span<T>) instead.
+            foreach (var f in Enumerable.Reverse(trace))
             {
                 var method = f.GetMethod();
                 var file = f.GetFileName();

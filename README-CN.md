@@ -26,7 +26,7 @@ dotnet-dna 是 [php-dna](https://github.com/domainreseller/php-dna) 的忠实移
 
 ### 最低要求
 
-- .NET 8 或更高版本，**或**任何支持 .NET Standard 2.0 的运行时（.NET Framework 4.6.2+、.NET Core 2.0+、Mono、Xamarin、Unity）。
+- .NET 10 或更高版本，**或**任何支持 .NET Standard 2.0 的运行时（.NET Framework 4.6.2+、.NET Core 2.0+、Mono、Xamarin、Unity）。
 - 无第三方依赖。本库使用 `HttpClient` 和 `System.Text.Json`（在 .NET Standard 2.0 上会自动引入 `System.Text.Json` 包）。
 
 ### 安装
@@ -949,7 +949,7 @@ dotnet test
 如果本地没有 .NET SDK，可以在 Docker 中运行：
 
 ```bash
-docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet test
+docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
 ```
 
 | 测试文件 | 说明 |

@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Targets .NET Standard 2.0 and .NET 10 (the .NET 8 target is replaced; .NET 8 and 9 apps keep working through the
+  .NET Standard 2.0 build).
+- The `System.Text.Json` dependency of the .NET Standard 2.0 build is updated to 10.0.15.
+- Tests, examples and CI build with the .NET 10 SDK.
+
 ## [1.0.1] - 2026-11-14
 
 ### Changed
