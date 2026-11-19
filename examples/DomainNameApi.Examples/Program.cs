@@ -1,95 +1,70 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Nodes;
+using DomainNameApi;
+using DomainNameApi.Examples;
 
-namespace DomainNameApi.Examples
+// Runs one example against the API:
+//
+//   dotnet run --project examples/DomainNameApi.Examples -- search example.com
+//
+// Credentials come from DNA_RESELLER_ID and DNA_API_KEY. The examples use the OTE test environment
+// unless DNA_ENV=production is set, so nothing here touches live domains or your live balance.
+
+var examples = new Dictionary<string, (string Usage, Func<DomainNameApiClient, string[], Task> Run)>(StringComparer.OrdinalIgnoreCase)
 {
-    /// <summary>
-    /// Runs one example against the gateway:
-    ///
-    ///   dotnet run --project examples/DomainNameApi.Examples -- GetDetails
-    ///
-    /// Credentials come from DNA_RESELLER_ID / DNA_API_KEY (and DNA_TEST_MODE=true for
-    /// the OTE test environment), otherwise the placeholders below are used.
-    /// </summary>
-    internal static class Program
+    ["account"] = ("account", AccountExamples.ShowBalanceAsync),
+    ["transactions"] = ("transactions", AccountExamples.ShowThisMonthsChargesAsync),
+    ["search"] = ("search <domain>", DomainExamples.SearchAsync),
+    ["bulk-search"] = ("bulk-search <name> [tld...]", DomainExamples.BulkSearchAsync),
+    ["domains"] = ("domains", DomainExamples.ListExpiringAsync),
+    ["domain"] = ("domain <domain>", DomainExamples.ShowDetailsAsync),
+    ["register"] = ("register <domain>", DomainExamples.RegisterAsync),
+    ["dns"] = ("dns <domain>", DnsExamples.ListAsync),
+    ["dns-add"] = ("dns-add <domain> <name> <type> <value>", DnsExamples.AddAsync),
+    ["tld"] = ("tld <name>", ProductExamples.ShowTldAsync),
+    ["errors"] = ("errors", ErrorExamples.ShowAsync),
+};
+
+if (args.Length == 0 || !examples.TryGetValue(args[0], out var example))
+{
+    Console.WriteLine("Usage: dotnet run --project examples/DomainNameApi.Examples -- <example> [arguments]");
+    Console.WriteLine();
+    foreach (var entry in examples.Values)
     {
-        // Credentials: your Reseller ID (UUID) + API Key from Panel → API Settings.
-        // Panel login credentials will NOT work.
-        private const string ResellerId = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"; // Reseller ID (UUID)
-        private const string ApiKey = "your-api-key";                          // API Key
-
-        private static readonly SortedDictionary<string, Func<DomainNameApiClient, JsonNode>> Examples =
-            new SortedDictionary<string, Func<DomainNameApiClient, JsonNode>>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["AddChildNameServer"] = AddChildNameServer.Run,
-            ["AddResourceRecord"] = AddResourceRecord.Run,
-            ["AddResourceRecordValue"] = AddResourceRecordValue.Run,
-            ["ApplyResourceRecords"] = ApplyResourceRecords.Run,
-            ["ApproveTransfer"] = ApproveTransfer.Run,
-            ["CancelTransfer"] = CancelTransfer.Run,
-            ["CheckAvailability"] = CheckAvailability.Run,
-            ["CheckTransfer"] = CheckTransfer.Run,
-            ["DeleteChildNameServer"] = DeleteChildNameServer.Run,
-            ["DeleteForwarding"] = DeleteForwarding.Run,
-            ["DeleteResourceRecord"] = DeleteResourceRecord.Run,
-            ["DeleteResourceRecordSet"] = DeleteResourceRecordSet.Run,
-            ["DisableTheftProtectionLock"] = DisableTheftProtectionLock.Run,
-            ["EditResourceRecord"] = EditResourceRecord.Run,
-            ["EnableTheftProtectionLock"] = EnableTheftProtectionLock.Run,
-            ["GetContacts"] = GetContacts.Run,
-            ["GetCurrentBalance"] = GetCurrentBalance.Run,
-            ["GetDetails"] = GetDetails.Run,
-            ["GetForwarding"] = GetForwarding.Run,
-            ["GetList"] = GetList.Run,
-            ["GetResellerDetails"] = GetResellerDetails.Run,
-            ["GetResourceRecords"] = GetResourceRecords.Run,
-            ["GetTldList"] = GetTldList.Run,
-            ["IsTrTLD"] = IsTrTLD.Run,
-            ["ModifyChildNameServer"] = ModifyChildNameServer.Run,
-            ["ModifyNameServer"] = ModifyNameServer.Run,
-            ["ModifyPrivacyProtectionStatus"] = ModifyPrivacyProtectionStatus.Run,
-            ["RegisterWithContactInfo"] = RegisterWithContactInfo.Run,
-            ["RegisterWithContactInfo-TR"] = RegisterWithContactInfoTR.Run,
-            ["RejectTransfer"] = RejectTransfer.Run,
-            ["RemoveResourceRecordValue"] = RemoveResourceRecordValue.Run,
-            ["Renew"] = Renew.Run,
-            ["ReplaceResourceRecordValue"] = ReplaceResourceRecordValue.Run,
-            ["SaveContacts"] = SaveContacts.Run,
-            ["SetForwarding"] = SetForwarding.Run,
-            ["SetResourceRecordSet"] = SetResourceRecordSet.Run,
-            ["SyncFromRegistry"] = SyncFromRegistry.Run,
-            ["Transfer"] = Transfer.Run,
-            ["ValidateContact"] = ValidateContact.Run,
-        };
-
-        private static int Main(string[] args)
-        {
-            if (args.Length == 0 || !Examples.TryGetValue(args[0], out var example))
-            {
-                Console.WriteLine("Usage: dotnet run --project examples/DomainNameApi.Examples -- <Example>");
-                Console.WriteLine();
-                Console.WriteLine("Examples:");
-                foreach (var name in Examples.Keys) Console.WriteLine("  " + name);
-                return args.Length == 0 ? 0 : 1;
-            }
-
-            var resellerId = Environment.GetEnvironmentVariable("DNA_RESELLER_ID") ?? ResellerId;
-            var apiKey = Environment.GetEnvironmentVariable("DNA_API_KEY") ?? ApiKey;
-            var testMode = Environment.GetEnvironmentVariable("DNA_TEST_MODE") ?? "false";
-
-            using (var dna = new DomainNameApiClient(resellerId, apiKey, testMode))
-            {
-                var result = example(dna);
-                Console.WriteLine(result?.ToJsonString(new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                }) ?? "null");
-            }
-            return 0;
-        }
+        Console.WriteLine("  " + entry.Usage);
     }
+    return 1;
+}
+
+var options = DomainNameApiOptions.FromEnvironment();
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DNA_ENV")) &&
+    string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DNA_TEST_MODE")))
+{
+    options.Environment = ApiEnvironment.Ote;
+}
+
+using var client = new DomainNameApiClient(options);
+Console.WriteLine($"Environment: {client.Environment} ({client.BaseAddress})");
+Console.WriteLine();
+
+try
+{
+    await example.Run(client, args.Skip(1).ToArray());
+    return 0;
+}
+catch (DomainNameApiException e)
+{
+    Console.WriteLine($"{e.Kind} [{e.Code}]: {e.Message}");
+    foreach (var error in e.ValidationErrors)
+    {
+        Console.WriteLine("  - " + error);
+    }
+    if (e.Hint is not null)
+    {
+        Console.WriteLine("Hint: " + e.Hint);
+    }
+    return 2;
+}
+catch (ArgumentException e)
+{
+    Console.WriteLine("Invalid input, nothing was sent: " + e.Message);
+    return 2;
 }

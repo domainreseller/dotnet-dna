@@ -10,1057 +10,817 @@
   <a href="README-IT.md"> | IT <img style="padding-top: 8px" src="https://raw.githubusercontent.com/yammadev/flag-icons/master/png/IT.png" alt="IT" height="20" /></a>
 </div>
 
-# مكتبة DomainNameAPI لـ .NET ‏(dotnet-dna)
+<div dir="rtl">
 
-عميل .NET الرسمي لواجهة DomainNameAPI REST API الخاصة بالموزعين: البحث عن النطاقات، والتسجيل، والتجديد، والنقل، وجهات الاتصال، وخوادم الأسماء، وخوادم الأسماء الفرعية، ومناطق DNS، وإعادة توجيه عناوين URL.
+# حزمة DomainNameAPI لـ .NET (dotnet-dna)
 
-تُعدّ dotnet-dna نقلًا أمينًا لمكتبة [php-dna](https://github.com/domainreseller/php-dna): الدوال نفسها، والطلبات نفسها على مستوى الشبكة، والقيم المُعادة نفسها. ويتم التحقق منها مقابل ملفات المطابقة (conformance fixtures) الخاصة بـ php-dna ‏(134 سيناريو)، لذا فإن الشيفرة المكتوبة لمكتبة PHP تنتقل إليها سطرًا بسطر.
+</div>
 
-## 📦 التنزيل — استخدم دائمًا صفحة الإصدارات (Releases)!
+<p>
+  <a href="https://github.com/domainreseller/dotnet-dna/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/domainreseller/dotnet-dna/ci.yml?branch=main&label=CI&style=flat-square" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-0B8DB5?style=flat-square" alt="Apache-2.0"></a>
+</p>
 
-⬇️ **احصل على أحدث نسخة مختبَرة من هنا: https://github.com/domainreseller/dotnet-dna/releases/latest**
+<div dir="rtl">
 
-> ⚠️ **لا** تستخدم الزر الأخضر **Code → Download ZIP** — فهو ينزّل فرع التطوير الخام. حزم الإصدارات مرقّمة الإصدار ومختبَرة وجاهزة لبيئة الإنتاج.
+حزمة SDK الرسمية لـ .NET الخاصة بمنصة الموزّعين [Domain Name API](https://www.domainnameapi.com). تغطي جميع عمليات REST API
+البالغ عددها 64 عملية بعملاء ونماذج مكتوبة بأنواع صريحة: النطاقات، وجهات الاتصال، وDNS، وDNSSEC، وشهادات SSL،
+والاستضافة، والطلبات، والمنتجات، وحسابك.
 
-## دليل التثبيت والتكامل
+</div>
 
-### الحد الأدنى من المتطلبات
+```csharp
+using var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Ote);
 
-- ‏.NET 10 أو أحدث، **أو** أي بيئة تشغيل تدعم .NET Standard 2.0 ‏(.NET Framework 4.6.2+‎، .NET Core 2.0+‎، Mono، Xamarin، Unity).
-- لا توجد اعتماديات من أطراف ثالثة. تستخدم المكتبة `HttpClient` و `System.Text.Json` (على .NET Standard 2.0 تُجلب حزمة `System.Text.Json` تلقائيًا).
+var search = await client.Domains.SearchAsync("example.com");
+if (search.Info?.IsAvailable == true)
+{
+    await client.Domains.RegisterAsync("example.com", contact, ["tr.apiname.com", "eu.apiname.com"]);
+}
+```
 
-### التثبيت
+<div dir="rtl">
 
-**أ) حزمة NuGet** — معرّف الحزمة هو `DomainNameApi`. يتضمن كل إصدار ملف `.nupkg`؛ وبمجرد إدراج الحزمة على NuGet.org يمكنك أيضًا تثبيتها مباشرة:
+- **كل شيء مكتوب بأنواع صريحة.** كل عملية هي فئة طلب، وكل إجابة هي نموذج مزوّد بتوثيق IntelliSense. لا قواميس ولا تحليل JSON.
+- **طلباتك الخاصة.** كل طلب يشتق من `BaseRequest`. ورّث منه لنقطة نهاية لا تغطيها الحزمة بعد.
+- **آمنة مع الأموال.** يعلن كل طلب ما إذا كان يقرأ، أو يكتب، أو يخصم من رصيدك، أو يحذف شيئًا. لا يُعاد إرسال الطلبات المدفوعة أبدًا، ووضع القراءة فقط يمنع أي تغيير.
+- **مرونة مدمجة.** تُراعى حدود معدل الطلبات تلقائيًا، وتُعاد محاولة إجابات 429، وتُعاد محاولة أخطاء الشبكة في عمليات القراءة.
+- **أخطاء واضحة.** نوع استثناء واحد مع تصنيف ثابت، ورمز الخطأ من API، وأخطاء التحقق على مستوى الحقول، ومعرّف الارتباط (correlation ID) وتلميح.
+- **.NET حديث.** عمليات غير متزامنة مع الإلغاء، وترقيم صفحات تلقائي عبر `IAsyncEnumerable`، ودعم `IHttpClientFactory`، وتعليقات nullable التوضيحية.
+- **تعمل في كل مكان.** .NET 10، وأي بيئة تشغيل تدعم .NET Standard 2.0 (‏.NET Framework 4.6.2 فما فوق، و.NET 8، وMono، وUnity).
+
+وهي النظير في .NET لـ [`dna`، أداة CLI الخاصة بـ Domain Name API](https://github.com/domainreseller/cli): وثيقة API نفسها،
+وفئات الأمان نفسها، وقواعد إعادة المحاولة ورموز الأخطاء نفسها.
+
+## المحتويات
+
+- [التثبيت](#install)
+- [بيانات الاعتماد](#credentials)
+- [البدء السريع](#quick-start)
+- [الإعداد](#configuration)
+- [الاستخدام](#usage): [الحساب](#account) · [النطاقات](#domains) · [جهات الاتصال](#contacts) · [DNS](#dns) · [DNSSEC](#dnssec) · [SSL](#ssl) · [الاستضافة](#hosting) · [الطلبات والمنتجات](#orders-and-products)
+- [الطلبات و`BaseRequest`](#requests-and-baserequest)
+- [الأخطاء](#errors)
+- [الأمان وإعادة المحاولة وحدود معدل الطلبات](#safety-retries-and-rate-limits)
+- [حقن التبعيات](#dependency-injection)
+- [اختبار شيفرتك](#testing-your-code)
+- [بنية المشروع](#project-layout)
+- [التطوير](#development)
+- [الترقية من 1.x](#upgrading-from-1x)
+
+<a id="install"></a>
+
+## التثبيت
+
+> [!IMPORTANT]
+> **استخدم دائمًا [أحدث إصدار](https://github.com/domainreseller/dotnet-dna/releases/latest).** حزم الإصدارات مرقّمة بإصدارات ومُختبرة.
+> أما زر **Code → Download ZIP** الأخضر فينزّل فرع التطوير بدلًا منها.
+
+</div>
 
 ```bash
 dotnet add package DomainNameApi
 ```
 
-لتثبيت ملف `.nupkg` تم تنزيله، ضعه في مجلد واستخدم ذلك المجلد كمصدر للحزم:
+<div dir="rtl">
+
+لتثبيت ملف `.nupkg` نزّلته، ضعه في مجلد واستخدم هذا المجلد كمصدر للحزم:
+
+</div>
 
 ```bash
 dotnet add package DomainNameApi --source ./packages
 ```
 
-**ب) مرجع مشروع** — نزّل الشيفرة المصدرية للإصدار وأضف مرجعًا إلى المشروع:
+<div dir="rtl">
+
+أو أضف مرجعًا إلى المشروع من المصدر البرمجي لأحد الإصدارات:
+
+</div>
 
 ```bash
 dotnet add reference path/to/dotnet-dna/src/DomainNameApi/DomainNameApi.csproj
 ```
 
-## 🔑 بيانات اعتماد API — Reseller ID و API Key
+<div dir="rtl">
 
-تتواصل المكتبة مع DomainNameAPI REST API وتحتاج فقط إلى بيانات اعتماد اثنتين تُمرَّران إلى الدالة الإنشائية (constructor):
+**المتطلبات:** .NET 10 أو أحدث، أو أي بيئة تشغيل تدعم .NET Standard 2.0. لا توجد تبعيات من أطراف ثالثة.
+على .NET Standard 2.0 تضيف الحزمة `System.Text.Json` و`Microsoft.Bcl.AsyncInterfaces` من Microsoft، وهما مدمجتان في .NET.
 
-| المُعامِل | القيمة |
-|---|---|
-| الأول | Reseller ID — بصيغة UUID مثل `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
-| الثاني | API Key |
+<a id="credentials"></a>
 
-> 💡 ستجد **Reseller ID** و **API Key** في لوحة DomainNameAPI الخاصة بك ضمن **إعدادات API**.
-> ⚠️ هذه **بيانات اعتماد API** — بيانات تسجيل الدخول إلى اللوحة **لن تعمل** هنا.
+## بيانات الاعتماد
 
-```csharp
-using DomainNameApi;
+تصادق API على كل طلب بقيمتين، وترسلهما الحزمة نيابةً عنك:
 
-var resellerId = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-var apiKey     = "your-api-key";
-
-// Live environment
-var dna = new DomainNameApiClient(resellerId, apiKey);
-
-// Test (OTE) environment
-var dna = new DomainNameApiClient(resellerId, apiKey, true);
-```
-
-تُزال المسافات البيضاء في بداية ونهاية بيانات الاعتماد كلتيهما. يمكن أيضًا تمرير علامة وضع الاختبار كنص، بالطريقة التي تخزنها بها ملفات الإعدادات ولوحات التحكم: القيم `"true"` و `"1"` و `"on"` و `"yes"` (بأي حالة أحرف) تختار بيئة الاختبار، وأي قيمة أخرى تختار البيئة الحية.
-
-```csharp
-var dna = new DomainNameApiClient(resellerId, apiKey, Environment.GetEnvironmentVariable("DNA_TEST_MODE"));
-```
-
-## 🚀 البدء السريع
-
-```csharp
-using System;
-using DomainNameApi;
-
-using var dna = new DomainNameApiClient("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "your-api-key");
-
-var result = dna.GetDetails("example.com");
-
-if ((string)result["result"] == "OK")
-{
-    Console.WriteLine("Status:  " + (string)result["data"]["Status"]);
-    Console.WriteLine("Expires: " + (string)result["data"]["Dates"]["Expiration"]);
-}
-else
-{
-    Console.WriteLine("Error " + (string)result["error"]["Code"] + ": " + (string)result["error"]["Message"]);
-}
-```
-
-### القيم المُعادة
-
-تُعيد كل دالة البنية نفسها التي تُعيدها php-dna، على هيئة `System.Text.Json.Nodes.JsonNode` (غالبًا `JsonObject`). اقرأ القيم باستخدام التحويلات (casts) أو `GetValue<T>()`، أو اطبع النتيجة كاملة باستخدام `ToJsonString()`:
-
-```csharp
-var details = dna.GetDetails("example.com");
-string status = (string)details["data"]["Status"];          // "Active"
-int    days   = (int)details["data"]["Dates"]["RemainingDays"];
-bool   locked = (string)details["data"]["LockStatus"] == "true";   // flags are the strings "true"/"false"
-Console.WriteLine(details.ToJsonString());
-```
-
-أسماء المفاتيح، والعلامات النصية (`"true"`/`"false"`)، والسلاسل المالية المنسّقة (`"11.9900"`) مطابقة تمامًا لما في php-dna. تستخدم معظم الدوال الغلاف `result` = `OK`/`ERROR`؛ بينما تستخدم `GetCurrentBalance` الغلاف القديم `OperationResult`، وتُعيد `CheckAvailability` قائمة مجردة عند النجاح.
-
-المُدخلات مثل جهات الاتصال وسمات TR ومرشحات القوائم هي من النوع `IDictionary<string, object>` بمفاتيح php-dna نفسها (`FirstName`، `EMail`، `AddressLine1`، `PhoneCountryCode`، `TRABISCITIZENID`، `PageSize`، ...). يمكن أن تكون قوائم خوادم الأسماء قائمة (`string[]`، `List<string>`) أو قاموسًا (تُستخدم القيم).
-
-### الاستخدام
-
-يمكن أيضًا تشغيل جميع الأمثلة أدناه من مجلد [examples](examples) (انظر [الأمثلة](#الأمثلة)).
-
-#### تسجيل النطاق
-
-ملاحظة: تتطلب نطاقات .tr مُعامِلات إضافية. يُستخدم المُعامِل `additionalAttributes` لأسماء النطاقات التي تتطلب معلومات إضافية مثل .tr.
-
-```csharp
-var contact = new Dictionary<string, object>
-{
-    ["FirstName"]        = "John",
-    ["LastName"]         = "Doe",
-    ["Company"]          = "Example Corp",
-    ["EMail"]            = "john.doe@example.com",
-    ["AddressLine1"]     = "123 Lorem Street",
-    ["AddressLine2"]     = "Suite 456",
-    ["AddressLine3"]     = "",
-    ["City"]             = "Springfield",
-    ["Country"]          = "US",
-    ["Fax"]              = "1234567890",
-    ["FaxCountryCode"]   = "1",
-    ["Phone"]            = "9876543210",
-    ["PhoneCountryCode"] = 1,
-    ["Type"]             = "Contact",
-    ["ZipCode"]          = "12345",
-    ["State"]            = "IL",
-};
-
-var result = dna.RegisterWithContactInfo(
-    "example.com",
-    1,
-    new Dictionary<string, object>
-    {
-        ["Administrative"] = contact,
-        ["Billing"]        = contact,
-        ["Technical"]      = contact,
-        ["Registrant"]     = contact,
-    },
-    new[] { "ns1.example.com", "ns2.example.com" },
-    eppLock: true,
-    privacyLock: false,
-    // Additional attributes are only required for .tr domains
-    additionalAttributes: new Dictionary<string, object>
-    {
-        ["TRABISDOMAINCATEGORY"] = 1,
-        ["TRABISCITIZIENID"]     = "12345678901",
-        ["TRABISNAMESURNAME"]    = "John Doe",
-        ["TRABISCOUNTRYID"]      = "840",
-        ["TRABISCITYID"]         = "17",
-    });
-```
-
-تُستكمل جهات الاتصال قبل إرسالها: الحقول الناقصة تحصل على قيم بديلة، وتُزال الأرقام وعلامات الترقيم من الأسماء، وتُستخدم المدينة عندما تكون الولاية مفقودة أو فارغة، وتتحول أسماء الدول إلى رموز ISO، وتُقسَّم أرقام الهواتف إلى رقم ورمز دولة — والرقم المكتوب برمز دولته الخاص بصيغة `+` أو `00` يحتفظ بذلك الرمز (انظر `ValidateContact`). عند عدم تحديد أي خادم أسماء (أو تحديد خوادم فارغة فقط)، يُستخدم `ns1.domainnameapi.com` و `ns2.domainnameapi.com`. بالنسبة لنطاقات .tr تُختصر سمات TRABIS إلى ما تقبله البوابة (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`، `TRABISCITIZENID`، `TRABISTAXOFFICE`، `TRABISTAXNUMBER`)؛ ويتم تحويل المفتاح القديم `TRABISCITIZIENID` والفئة الرقمية تلقائيًا.
-
-<details>
-<summary>مثال على مخرجات تسجيل النطاق</summary>
-
-```json
-{
-  "data": {
-    "ID": 123456,
-    "Status": "Active",
-    "DomainName": "example.com",
-    "AuthCode": "Xy9#mK2$pL5@vN8",
-    "LockStatus": "true",
-    "PrivacyProtectionStatus": "false",
-    "IsChildNameServer": "false",
-    "Contacts": {
-      "Billing": { "ID": 987654 },
-      "Technical": { "ID": 987654 },
-      "Administrative": { "ID": 987654 },
-      "Registrant": { "ID": 987654 }
-    },
-    "Dates": { "Start": "2024-03-15T10:00:00", "Expiration": "2025-03-15T10:00:00", "RemainingDays": 365 },
-    "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-    "Additional": [],
-    "ChildNameServers": []
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-إذا رفضت البوابة الطلب (أي أجابت بـ `"success": false`)، تُعيد الدالة غلاف خطأ مع `Code` = `REGISTER_DOMAIN` ورسالة البوابة، وبذلك لا يُبلَّغ أبدًا عن تسجيل مرفوض على أنه تم. وتتصرف `Renew` ‏(`RENEW_DOMAIN`) و `Transfer` ‏(`TRANSFER_DOMAIN`) بالطريقة نفسها.
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### تجديد النطاق
-
-```csharp
-var result = dna.Renew("example.com", 1);
-```
-
-<details>
-<summary>مثال على مخرجات تجديد النطاق</summary>
-
-```json
-{ "result": "OK", "data": { "ExpirationDate": "2025-03-15T10:00:00" } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### نقل النطاق
-
-```csharp
-var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
-```
-
-> ℹ️ لا يُرسل النقل جهات اتصال أبدًا: يحمل الطلب دائمًا قائمة جهات اتصال فارغة، ويتولى المسجّل نقل جهات الاتصال بنفسه. لذلك لا تحتوي `Transfer` على مُعامِل لجهات الاتصال؛ وعند الحاجة، حدّث جهات الاتصال باستخدام `SaveContacts` بعد اكتمال النقل.
-
-<details>
-<summary>مثال على مخرجات نقل النطاق</summary>
-
-```json
-{
-  "data": {
-    "ID": 0, "Status": "Active", "DomainName": "", "AuthCode": "",
-    "LockStatus": "false", "PrivacyProtectionStatus": "false", "IsChildNameServer": "false",
-    "Contacts": { "Billing": { "ID": 0 }, "Technical": { "ID": 0 }, "Administrative": { "ID": 0 }, "Registrant": { "ID": 0 } },
-    "Dates": { "Start": "", "Expiration": "2027-11-09T12:00:00", "RemainingDays": 365 },
-    "NameServers": [], "Additional": [], "ChildNameServers": []
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### إلغاء النقل أو الموافقة عليه أو رفضه
-
-```csharp
-dna.CancelTransfer("example.com");   // pending incoming transfer
-dna.ApproveTransfer("example.com");  // pending outgoing transfer
-dna.RejectTransfer("example.com");   // pending outgoing transfer
-```
-
-<details>
-<summary>مثال على مخرجات إلغاء النقل</summary>
-
-```json
-{ "result": "OK", "data": { "DomainName": "example.com", "Status": "Cancelled" } }
-```
-
-تستجيب `ApproveTransfer` و `RejectTransfer` بالطريقة نفسها مع `Approved` / `Rejected`.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### التحقق من إمكانية النقل
-
-```csharp
-var result = dna.CheckTransfer("example.com", "Ab1!xyZ9");
-```
-
-تكون قيمة `result` هي `OK` فقط عندما يُفيد السجل (registry) بأن النطاق قابل للنقل؛ وإلا فهي `ERROR` مع `Code` = `TRANSFER_NOT_AVAILABLE`، وتظل التفاصيل متاحة ضمن `data`.
-
-<details>
-<summary>مثال على مخرجات التحقق من إمكانية النقل</summary>
-
-```json
-{
-  "result": "OK",
-  "data": {
-    "TransferAvailabilityStatus": true,
-    "AuthCodeIsRequired": true,
-    "AuthCodeIsValid": true,
-    "UserTransferRequired": false,
-    "TransferLock": false,
-    "Message": "Domain can be transferred",
-    "MessageKey": "TransferAvailable",
-    "Additional": []
-  }
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### قائمة النطاقات
-
-```csharp
-var result = dna.GetList(new Dictionary<string, object>
-{
-    ["OrderColumn"]    = "Id",
-    ["OrderDirection"] = "ASC",
-    ["PageNumber"]     = 0,
-    ["PageSize"]       = 1000,
-});
-```
-
-يبدأ `PageNumber` من الصفر. يمكن أيضًا تمرير أسماء المرشحات الخاصة بالبوابة (`MaxResultCount`، `SkipCount`، `Sorting`، `DomainName`، ...).
-
-<details>
-<summary>مثال على مخرجات قائمة النطاقات</summary>
-
-```json
-{
-  "data": {
-    "Domains": [
-      {
-        "ID": 564346,
-        "Status": "Active",
-        "DomainName": "example.com",
-        "AuthCode": "",
-        "LockStatus": "false",
-        "PrivacyProtectionStatus": "false",
-        "IsChildNameServer": "false",
-        "Contacts": { "Billing": { "ID": "" }, "Technical": { "ID": "" }, "Administrative": { "ID": "" }, "Registrant": { "ID": "" } },
-        "Dates": { "Start": "2024-03-15T10:00:00", "Expiration": "2025-03-15T10:00:00", "RemainingDays": 365 },
-        "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-        "Additional": [],
-        "ChildNameServers": []
-      }
-    ]
-  },
-  "result": "OK",
-  "TotalCount": 1
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### قائمة امتدادات النطاقات (TLD)
-
-```csharp
-var result = dna.GetTldList(100);
-```
-
-<details>
-<summary>مثال على مخرجات قائمة امتدادات النطاقات</summary>
-
-```json
-{
-  "data": [
-    {
-      "id": 1,
-      "status": "Active",
-      "maxchar": 63,
-      "maxperiod": 10,
-      "minchar": 1,
-      "minperiod": 1,
-      "tld": "com",
-      "pricing": {
-        "registration": { "1": "10.8100" },
-        "renew": { "1": "11.0100" },
-        "transfer": { "1": "10.6100" },
-        "restore": { "1": "99.9000" }
-      },
-      "currencies": { "registration": "USD", "renew": "USD", "transfer": "USD", "restore": "USD" }
-    }
-  ],
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### التحقق من توفر النطاق
-
-```csharp
-var result = dna.CheckAvailability(new[] { "hello", "world123x0" }, new[] { "com", "net" }, 1, "create");
-```
-
-<details>
-<summary>مثال على مخرجات التحقق من توفر النطاق</summary>
-
-```json
-[
-  {
-    "TLD": "com", "DomainName": "hello", "Status": "notavailable", "Command": "create", "Period": 1,
-    "IsFee": false, "Price": "10.8100", "Currency": "USD", "Reason": "Domain exists"
-  },
-  {
-    "TLD": "com", "DomainName": "world123x0", "Status": "available", "Command": "create", "Period": 1,
-    "IsFee": false, "Price": "10.8100", "Currency": "USD", "Reason": null
-  }
-]
-```
-
-عند الفشل تُعيد الدالة غلاف الخطأ المعتاد بدلًا من قائمة، لذا تحقق أولًا من `result is JsonArray`.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### تفاصيل النطاق
-
-```csharp
-var result = dna.GetDetails("example.com");
-var synced = dna.SyncFromRegistry("example.com"); // same envelope
-```
-
-<details>
-<summary>مثال على مخرجات تفاصيل النطاق</summary>
-
-```json
-{
-  "data": {
-    "ID": 564346,
-    "Status": "Active",
-    "DomainName": "example.com",
-    "AuthCode": "DHQ!K52",
-    "LockStatus": "true",
-    "PrivacyProtectionStatus": "false",
-    "IsChildNameServer": "true",
-    "Contacts": {
-      "Billing": { "ID": "DNA-B-4" },
-      "Technical": { "ID": "DNA-T-3" },
-      "Administrative": { "ID": "DNA-A-2" },
-      "Registrant": { "ID": "DNA-R-1" }
-    },
-    "Dates": { "Start": "2025-05-26T16:08:37", "Expiration": "2027-05-26T16:08:37", "RemainingDays": 449 },
-    "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-    "Additional": [],
-    "ChildNameServers": [ { "ns": "ns1.example.com", "ip": "1.2.3.4" } ]
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### تعديل خوادم الأسماء
-
-```csharp
-var result = dna.ModifyNameServer("example.com", new[] { "ns1.example.com", "ns2.example.com" });
-```
-
-تُزال المسافات من أسماء المضيفين، وتُحوَّل إلى أحرف صغيرة، وتُحذف النقطة في نهايتها؛ كما تُستبعد الإدخالات الفارغة والمكررة.
-
-<details>
-<summary>مثال على مخرجات تعديل خوادم الأسماء</summary>
-
-```json
-{ "result": "OK", "data": { "NameServers": [ "ns1.example.com", "ns2.example.com" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### تفعيل قفل النطاق
-
-```csharp
-var result = dna.EnableTheftProtectionLock("example.com");
-```
-
-<details>
-<summary>مثال على مخرجات تفعيل قفل النطاق</summary>
-
-```json
-{ "result": "OK", "data": { "LockStatus": true } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### إلغاء قفل النطاق
-
-```csharp
-var result = dna.DisableTheftProtectionLock("example.com");
-```
-
-<details>
-<summary>مثال على مخرجات إلغاء قفل النطاق</summary>
-
-```json
-{ "result": "OK", "data": { "LockStatus": false } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### إضافة خادم أسماء فرعي
-
-```csharp
-var result = dna.AddChildNameServer("example.com", "ns1.example.com", "1.2.3.4");
-```
-
-<details>
-<summary>مثال على مخرجات إضافة خادم أسماء فرعي</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com", "IPAdresses": [ "1.2.3.4" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### حذف خادم أسماء فرعي
-
-```csharp
-var result = dna.DeleteChildNameServer("example.com", "ns1.example.com");
-```
-
-<details>
-<summary>مثال على مخرجات حذف خادم أسماء فرعي</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com" } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### تحديث خادم الأسماء الفرعي
-
-```csharp
-var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.4");
-```
-
-<details>
-<summary>مثال على مخرجات تحديث خادم الأسماء الفرعي</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com", "IPAdresses": [ "1.2.3.4" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### تعديل حالة حماية الخصوصية
-
-```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
-
-// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
-var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
-```
-
-المُعامِل الثالث الاختياري (`reason`) محفوظ لأغراض التوافق فقط؛ إذ لا يوجد مثل هذا الحقل لدى البوابة ولا يتم إرساله.
-
-<details>
-<summary>مثال على مخرجات تعديل حالة حماية الخصوصية</summary>
-
-```json
-{ "data": { "PrivacyProtectionStatus": true }, "result": "OK" }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### الحصول على جهات اتصال النطاق
-
-```csharp
-var result = dna.GetContacts("example.com");
-```
-
-<details>
-<summary>مثال على مخرجات الحصول على جهات اتصال النطاق</summary>
-
-```json
-{
-  "data": {
-    "contacts": {
-      "Administrative": {
-        "ID": "DNA-A-2",
-        "Status": "Active",
-        "AuthCode": "",
-        "FirstName": "Grace",
-        "LastName": "Hopper",
-        "Company": "",
-        "EMail": "grace@example.com",
-        "Type": "Administrative",
-        "Address": {
-          "Line1": "Example Street 2", "Line2": "", "Line3": "",
-          "State": "DC", "City": "Washington", "Country": "US", "ZipCode": "20001"
-        },
-        "Phone": {
-          "Phone": { "Number": "2025550100", "CountryCode": "1" },
-          "Fax": { "Number": "2025550101", "CountryCode": "1" }
-        },
-        "Additional": []
-      },
-      "Billing": { "...": "..." },
-      "Registrant": { "...": "..." },
-      "Technical": { "...": "..." }
-    }
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### حفظ جهات اتصال النطاق
-
-```csharp
-var contact = new Dictionary<string, object>
-{
-    ["FirstName"]        = "John",
-    ["LastName"]         = "Doe",
-    ["Company"]          = "Example Corp",
-    ["EMail"]            = "john@example.com",
-    ["AddressLine1"]     = "123 Main Street",
-    ["AddressLine2"]     = "",
-    ["AddressLine3"]     = "",
-    ["City"]             = "Springfield",
-    ["Country"]          = "US",
-    ["Fax"]              = "5559876543",
-    ["FaxCountryCode"]   = "1",
-    ["Phone"]            = "5551234567",
-    ["PhoneCountryCode"] = 1,
-    ["Type"]             = "Contact",
-    ["ZipCode"]          = "62701",
-    ["State"]            = "IL",
-};
-
-var result = dna.SaveContacts("example.com", new Dictionary<string, object>
-{
-    ["Administrative"] = contact,
-    ["Billing"]        = contact,
-    ["Technical"]      = contact,
-    ["Registrant"]     = contact,
-});
-```
-
-يمكن أيضًا تمرير جهات الاتصال بالبنية المتداخلة (`Address` ← `Line1`/`City`/...، `Phone` ← `Phone`/`Fax` ← `Number`/`CountryCode`)، وهي البنية التي تُعيدها `GetContacts`.
-
-<details>
-<summary>مثال على مخرجات حفظ جهات اتصال النطاق</summary>
-
-```json
-{ "result": "OK", "data": { "contacts": [] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### الحصول على تفاصيل الموزع
-
-```csharp
-var result = dna.GetResellerDetails();
-```
-
-<details>
-<summary>مثال على مخرجات تفاصيل الموزع</summary>
-
-```json
-{
-  "result": "OK",
-  "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "active": true,
-  "name": "Example Reseller",
-  "balance": "500.00",
-  "currency": "USD",
-  "symbol": "$",
-  "balances": [
-    { "balance": "500.00", "currency": "USD", "symbol": "$" },
-    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
-  ]
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### الرصيد الحالي
-
-```csharp
-var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
-```
-
-<details>
-<summary>مثال على مخرجات الرصيد الحالي</summary>
-
-```json
-{
-  "ErrorCode": 0,
-  "OperationMessage": "Command completed succesfully.",
-  "OperationResult": "SUCCESS",
-  "Balance": "601.64",
-  "CurrencyId": 2,
-  "CurrencyInfo": null,
-  "CurrencyName": "USD",
-  "CurrencySymbol": "$"
-}
-```
-
-عند الفشل تكون قيمة `OperationResult` هي `FAILED`، ويحتوي `ErrorCode` على رمز الخطأ (مثل `API_429`)، وتكون قيمة `Balance` هي `"0.00"`. يُبلغ الحساب عن أرصدة USD و TRY فقط؛ وطلب عملة أخرى (EUR، GBP، ...) يفشل مع `ErrorCode` = `BALANCE` والرسالة `No EUR balance is reported for this account. Available: USD, TRY.`
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### إدارة منطقة DNS
-
-تخزّن البوابة المنطقة على شكل **مجموعات** سجلات (الاسم + النوع ← القيم) وتستبدل المجموعة كاملة عند كل عملية كتابة. تتولى الدوال `*ResourceRecordSet` و `*ResourceRecordValue` ذلك نيابة عنك. يمكن أن تكون الأسماء نسبية (`www`)، أو الجذر (`@` أو `""` أو `example.com`)، أو مؤهلة بالكامل (`www.example.com.`). الأنواع المدعومة: `A`، `AAAA`، `ALIAS`، `CAA`، `CNAME`، `DS`، `MX`، `NAPTR`، `PTR`، `SRV`، `TLSA`، `TXT`. تُعتمد عمليات الكتابة فورًا ما لم تمرر `apply: false` وتستدعِ `ApplyResourceRecords` بنفسك؛ وإذا فشل ذلك الاعتماد التلقائي، تُعيد الدالة خطأ الاعتماد (ويبقى التغيير مُجهَّزًا وغير مُفعَّل). يُفصل بين استدعاءات المنطقة المتتالية بثانية واحدة على الأقل، لأن البوابة ترد على الطلبات المتلاحقة بـ HTTP 429.
-
-```csharp
-// List every record (one row per value; names are fully qualified)
-var records = dna.GetResourceRecords("example.com");
-
-// Make a set hold exactly these values
-dna.SetResourceRecordSet("example.com", "@", "MX", new[] { "10 mx1.example.com", "20 mx2.example.com" }, 3600);
-
-// Add / remove / replace one value, keeping the others
-dna.AddResourceRecordValue("example.com", "@", "MX", "30 mx3.example.com");
-dna.RemoveResourceRecordValue("example.com", "@", "MX", "20 mx2.example.com.");
-dna.ReplaceResourceRecordValue("example.com", "@", "A", "192.0.2.1", "192.0.2.2");
-
-// Remove a whole set
-dna.DeleteResourceRecordSet("example.com", "old", "A");
-
-// Low-level calls (one write = one set)
-dna.AddResourceRecord("example.com", "www", "A", "192.0.2.5", 300);
-dna.EditResourceRecord("example.com", "www", "www", "A", "192.0.2.6", 600);
-dna.DeleteResourceRecord("example.com", "www", "192.0.2.6", "A");
-
-// Stage several changes, then commit once
-dna.AddResourceRecord("example.com", "api", "A", "192.0.2.7", 300, apply: false);
-dna.AddResourceRecord("example.com", "cdn", "CNAME", "cdn.example.net.", 300, apply: false);
-dna.ApplyResourceRecords("example.com");
-```
-
-<details>
-<summary>مثال على مخرجات إدارة منطقة DNS</summary>
-
-`GetResourceRecords`:
-
-```json
-{
-  "result": "OK",
-  "data": {
-    "records": [
-      { "Name": "example.com.", "Type": "A", "TTL": 3600, "Content": "192.0.2.1", "Disabled": false },
-      { "Name": "www.example.com.", "Type": "CNAME", "TTL": 300, "Content": "example.com.", "Disabled": false },
-      { "Name": "example.com.", "Type": "MX", "TTL": 3600, "Content": "10 mx1.example.com.", "Disabled": false }
-    ]
-  }
-}
-```
-
-`SetResourceRecordSet` / `AddResourceRecordValue` (يُعرض النوع بأحرف كبيرة و TTL كما أُرسل، ضمن النطاق 1–86400 ثانية):
-
-```json
-{ "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
-```
-
-إضافة قيمة موجودة مسبقًا، أو حذف قيمة غير موجودة، لا تُغيّر شيئًا وتكون الاستجابة `{"result":"OK","data":{..., "Changed": false}}`. ويُرفض النوع غير المدعوم قبل إجراء أي استدعاء:
-
-```json
-{ "result": "ERROR", "error": { "Code": "ADD_ZONE", "Message": "Record type \"NS\" is not supported by the DNS zone API. Supported types: A, AAAA, ALIAS, CAA, CNAME, DS, MX, NAPTR, PTR, SRV, TLSA, TXT.", "Details": "..." } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### إعادة توجيه عناوين URL
-
-```csharp
-dna.SetForwarding("example.com", "https://www.example.org", "Standard"); // or "Frame" (masked)
-var forwarding = dna.GetForwarding("example.com");
-dna.DeleteForwarding("example.com");
-```
-
-<details>
-<summary>مثال على مخرجات إعادة توجيه عناوين URL</summary>
-
-```json
-{ "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
-```
-
-عند عدم تهيئة أي إعادة توجيه (تجيب البوابة بـ `Redirect information not found`)، تُعيد `GetForwarding` القيمة `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`. أما أي خطأ آخر — على سبيل المثال نطاق غير موجود — فيُعاد كخطأ.
-
-تُعيد `DeleteForwarding` القيمة `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}`؛ وعندما لا يكون هناك شيء مُهيَّأ، لا تُجري أي تغيير وتجيب بـ `"Removed": false`.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### أدوات مساعدة (دون اتصال بالشبكة)
-
-```csharp
-bool isTr = dna.IsTrTLD("example.com.tr"); // true
-
-var contact = dna.ValidateContact(new Dictionary<string, object>
-{
-    ["FirstName"] = " Jo ",
-    ["Phone"]     = "+1 (202) 555-0100",
-    ["Country"]   = "Turkey",
-});
-```
-
-<details>
-<summary>مثال على مخرجات ValidateContact</summary>
-
-```json
-{
-  "FirstName": "Jo", "Phone": "12025550100", "Country": "TR", "LastName": "Isimyok",
-  "AddressLine1": "Addres yok", "City": "ISTANBUL", "State": "ISTANBUL", "ZipCode": "34000",
-  "PhoneCountryCode": "90", "Fax": "", "FaxCountryCode": ""
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-### معالجة الأخطاء
-
-لا تُطلق الدوال استثناءات أبدًا عند حدوث مشكلات في API أو الشبكة؛ بل تُعيد غلاف خطأ:
-
-```json
-{
-  "result": "ERROR",
-  "error": {
-    "Code": "API_404",
-    "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again.",
-    "GatewayCode": "Dna.DomainService:Domain:10007"
-  }
-}
-```
-
-| الحالة | `Code` | `Message` |
+| القيمة | الترويسة (Header) | أين تجدها |
 |---|---|---|
-| خطأ HTTP من البوابة | `API_<status>`، مثل `API_400`، `API_429`، `API_500` | رسالة البوابة؛ وعند استجابة فارغة `HTTP 429 - Too Many Requests` |
-| بيانات اعتماد خاطئة (HTTP 301/302) | `API_302` | `Invalid API credentials` |
-| أخطاء التحقق من الصحة | `API_400` | رسالة البوابة؛ ويسرد `Details` الحقول، مثل `Admin PostalCode - 'PostalCode' is required` |
-| انتهاء المهلة | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| أعطال الشبكة الأخرى (DNS، الاتصال، TLS، إعادة التعيين) | `CURL_6`، `CURL_7`، `CURL_60`، `CURL_56` | `Curl error during request: ...` |
-| رفض التسجيل أو التجديد أو النقل (`"success": false`) | `REGISTER_DOMAIN`، `RENEW_DOMAIN`، `TRANSFER_DOMAIN` | رسالة البوابة |
-| استجابة نجاح فارغة أو غير قابلة للاستخدام | `RESPONSE` | `Invalid response received from server! Response is empty.` |
-| فحوصات تُجرى قبل استدعاء البوابة | مثل `AVAILABILITY`، `ADD_ZONE`، `SET_FORWARD` | وصف للمشكلة |
+| Reseller ID (معرّف UUID) | `__reseller` | لوحة الموزّع ← **API settings** |
+| API key | `X-API-KEY` | لوحة الموزّع ← **API settings** |
 
-تشير رموز `API_<n>` دائمًا إلى حالة HTTP. وعندما ترسل البوابة رمز الخطأ الخاص بها، يحمله الغلاف أيضًا في `GatewayCode` (مثل `Dna.DomainService:Domain:10007`)، بحيث يمكنك التمييز بين "النطاق غير موجود" و"امتداد النطاق غير مدعوم" دون تحليل الرسالة. تستخدم أعطال الشبكة `CURL_<n>`، حيث يتبع الرقم ترقيم libcurl لكي تتطابق الرموز مع php-dna. فقط الأخطاء البرمجية (مثل تمرير نوع كائن غير مدعوم) يمكن أن تُطلق استثناءات.
+> [!NOTE]
+> هذه **بيانات اعتماد API**: بيانات تسجيل الدخول إلى اللوحة لا تعمل هنا. **تستخدم بيئة الإنتاج وبيئة OTE (بيئة الاختبار)
+> مفاتيح API مختلفة.** استخدام مفتاح إحداهما مع الأخرى يفشل بالخطأ `INVALID_API_KEY` أو `INVALID_RESELLER`.
 
-لأغراض استكشاف الأخطاء وإصلاحها، يمكن فحص آخر استدعاء:
+<a id="quick-start"></a>
 
-```csharp
-dna.GetLastFunction();       // "request:GET domains/info"
-dna.GetRequestData();        // { "url": ..., "method": ..., "payload": ... }
-dna.GetResponseData();       // decoded response, or { "raw_response": "..." }
-dna.GetResponseHeaders();    // { "url", "http_code", "content_type", "total_time", "headers" }
-dna.GetParsedResponseData(); // parsed response or the error built from it
-```
+## البدء السريع
 
-### وضع الاختبار
-
-مرّر `true` كمُعامِل ثالث للدالة الإنشائية لاستخدام بيئة اختبار OTE ‏(`https://ote.domainresellerapi.com/api/v1`) بدلًا من البيئة الحية (`https://api.domainresellerapi.com/api/v1`). تعرض `GetServiceUrl()` العنوان المستخدم، وتتيح `SetServiceUrl(url)` تجاوزه.
-
-### تقارير الأخطاء (القياس عن بُعد)
-
-عندما يفشل استدعاء API، يمكن للمكتبة إرسال تقرير خطأ إلى نظام تتبع الأخطاء الخاص بـ DomainNameAPI ‏(Sentry). كما يمكن إرسال جزء صغير عشوائي من الاستدعاءات الناجحة (4%، بالإضافة إلى كل استدعاء تتجاوز مدته ثانية واحدة) كسجل أداء. يساعد ذلك DomainNameAPI على اكتشاف المشكلات وإصلاحها. تقارير الأخطاء **مفعّلة افتراضيًا**.
-
-**ما يتم إرساله:**
-
-- رمز الخطأ ورسالته
-- مسار نقطة النهاية المستدعاة وطريقة HTTP
-- مدة الاستدعاء
-- اسم التطبيق (`DomainNameAPI-DotNet`) وإصدار المكتبة وإصدار .NET
-- معرّف الموزع (Reseller ID) واسم النطاق
-- عنوان IP العام للخادم (يتم الحصول عليه عبر `api.ipify.org` في الخلفية)
-- اسم حساب نظام التشغيل الذي يعمل التطبيق تحته
-- طلب API واستجابته، بما في ذلك بيانات جهات اتصال النطاق؛ ولا تُحجب إلا بيانات الاعتماد — إذ تُستبدل رموز EPP/التفويض ومفاتيح API وكلمات المرور والرموز المميزة (tokens) بـ `***`
-
-**ما لا يُرسَل أبدًا:** رموز EPP/التفويض ومفاتيح API وكلمات المرور والرموز المميزة بصيغة مقروءة؛ ووسائط الدوال في تتبعات المكدس (stack traces).
-
-**لماذا وإلى متى:** تُستخدم البيانات فقط لقياس الاستخدام والتشخيص المبكر للمشكلات، وتُحفظ لمدة 30 يومًا على خادم Sentry الخاص بـ DomainNameAPI، ثم تُحذف تلقائيًا.
-
-تُرسَل التقارير في الخلفية: فهي لا تحجب استدعاءك ولا تبطئه أبدًا، ولا تُطلق استثناءات أبدًا. ولا يتم الإبلاغ عن الأخطاء المتوقعة كثيرة التكرار (نطاق غير موجود، رصيد غير كافٍ، بيانات اعتماد غير صالحة، عدم تهيئة إعادة توجيه، ...).
-
-**كيفية إيقافها:** استدعِ `SetErrorReportingEnabled(false)` بعد إنشاء العميل:
+</div>
 
 ```csharp
-var dna = new DomainNameApiClient(resellerId, apiKey);
-dna.SetErrorReportingEnabled(false);
+using DomainNameApi;
+using DomainNameApi.Contacts;
+using DomainNameApi.Domains;
+
+// OTE is the test environment: real API, its own data, no real money.
+using var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Ote);
+
+// 1. Check the credentials and the balance.
+var account = await client.Account.GetAsync();
+Console.WriteLine($"{account.ResellerName}: {account.UsdBalance} USD");
+
+// 2. Is the domain available, and at what price?
+var search = await client.Domains.SearchAsync("my-new-domain.com");
+Console.WriteLine($"{search.Info?.Status} {search.Info?.Price} {search.Info?.Currency}");
+
+// 3. Register it with one contact for all four roles. This charges the balance.
+var contact = new ContactInfo
+{
+    FirstName = "Ada", LastName = "Lovelace", Email = "ada@example.com",
+    Address = "1 Example Street", City = "Istanbul", State = "Istanbul", PostalCode = "34000",
+    Country = "TR", PhoneCountryCode = "90", Phone = "5551234567",
+};
+var result = await client.Domains.RegisterAsync("my-new-domain.com", contact, ["tr.apiname.com", "eu.apiname.com"]);
+Console.WriteLine($"{result.Status}, expires {result.ExpirationDate:d}");
+
+// 4. List every domain, page by page.
+await foreach (var domain in client.Domains.ListAllAsync())
+{
+    Console.WriteLine($"{domain.DomainName} expires in {domain.RemainingDays} days");
+}
 ```
 
-**الوضع المصغّر:** تُبقي `SetTelemetryMinimal(true)` الإبلاغ مفعّلًا لكنها لا ترسل سوى رمز الخطأ ورسالته، ونقطة النهاية، والتوقيت، والإصدارات، ومعرّف الموزع — دون بيانات الطلب/الاستجابة أو النطاق أو عنوان IP أو اسم الحساب.
+<div dir="rtl">
 
-يمكن تغيير الوجهة عبر الخاصية `TelemetryDsn` (على سبيل المثال إلى مشروع Sentry الخاص بك).
+يشغّل [مشروع الأمثلة](examples/DomainNameApi.Examples) سيناريوهات مثل هذه على OTE:
 
-> 🔒 **الأمان:** التحقق من شهادة TLS مفعّل. على خادم يحتوي على حزمة CA قديمة يمكن إيقافه باستخدام `dna.SetSslVerification(false);` — وهذا غير مستحسن؛ فتحديث حزمة CA هو الحل الأفضل.
-
-### إعدادات متقدمة
-
-- **المهلات الزمنية:** ‏30 ثانية لكل طلب و10 ثوانٍ للاتصال؛ ويمكن تغييرها عبر الخاصيتين `Timeout` و `ConnectTimeout`.
-- **طبقة نقل مخصصة:** مرّر `IHttpTransport` إلى الدالة الإنشائية (`new DomainNameApiClient(id, key, false, transport)`) أو عيّن الخاصية `Transport` لتوجيه الطلبات عبر حزمة HTTP الخاصة بك أو عبر وكيل (proxy) أو بديل اختباري (test double). يجب أن تُعيد التطبيقات كل حالات HTTP (دون اتباع عمليات إعادة التوجيه) وأن تُطلق `TransportException` عند أعطال الشبكة.
-- **الخيوط (Threads):** يحتفظ العميل بآخر طلب واستجابة لأغراض التشخيص، وهو غير آمن للاستخدام المتزامن بين الخيوط. استخدم نسخة واحدة لكل خيط (أو لكل طلب) أو قم بمزامنة الوصول. تُحرر `Dispose()` كائن `HttpClient` الأساسي.
-- **User-Agent:** تُرسَل الطلبات بالقيمة `DomainNameAPI-DotNet/1.0.1`.
-
-### الأمثلة
-
-يحتوي مشروع [examples](examples/DomainNameApi.Examples) على ملف قابل للتشغيل لكل دالة (`GetDetails`، `RegisterWithContactInfo`، `RegisterWithContactInfo-TR`، ودوال منطقة DNS وإعادة التوجيه، ...). عيّن بيانات الاعتماد الخاصة بك وشغّل أحدها:
+</div>
 
 ```bash
-export DNA_RESELLER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-export DNA_API_KEY=your-api-key
-export DNA_TEST_MODE=true   # optional: use the OTE test environment
-
-dotnet run --project examples/DomainNameApi.Examples -- GetDetails
-dotnet run --project examples/DomainNameApi.Examples            # lists all examples
+dotnet run --project examples/DomainNameApi.Examples -- search example.com
 ```
 
-### الاختبارات
+<div dir="rtl">
 
-لا تحتاج الاختبارات إلى بيانات اعتماد ولا تُجري أي استدعاءات شبكة خارجية:
+<a id="configuration"></a>
+
+## الإعداد
+
+هناك أربع طرق لإنشاء عميل:
+
+</div>
+
+```csharp
+// Credentials and environment
+var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Production);
+
+// All settings
+var client = new DomainNameApiClient(new DomainNameApiOptions
+{
+    ResellerId = resellerId,
+    ApiKey = apiKey,
+    Environment = ApiEnvironment.Ote,
+    Timeout = TimeSpan.FromSeconds(30),
+    ReadOnly = true,
+});
+
+// The same environment variables the dna CLI reads
+var client = DomainNameApiClient.FromEnvironment();
+
+// On top of your own HttpClient (for example from IHttpClientFactory)
+var client = new DomainNameApiClient(httpClient, options);
+```
+
+<div dir="rtl">
+
+| الخيار | الافتراضي | المعنى |
+|---|---|---|
+| `ResellerId`, `ApiKey` | (مطلوب) | بيانات الاعتماد. |
+| `Environment` | `Production` | `Production` (‏`https://api.domainresellerapi.com`) أو `Ote` (‏`https://ote.domainresellerapi.com`). |
+| `BaseAddress` | لا شيء | يتجاوز عنوان البيئة، مثلًا عند استخدام وكيل (proxy). |
+| `Timeout` | 60 ثانية | المهلة الزمنية لمحاولة واحدة. |
+| `MaxRetries` | 2 | عدد مرات تكرار الطلب الفاشل (انظر [إعادة المحاولة](#safety-retries-and-rate-limits)). القيمة 0 توقف إعادة المحاولة. |
+| `MaxRetryDelay` | 30 ثانية | أطول انتظار قبل إعادة المحاولة. |
+| `PaceRequests` | `true` | يوزّع الطلبات زمنيًا لتبقى ضمن حدود معدل الطلبات في البوابة (gateway). |
+| `ReadOnly` | `false` | يمنع كل طلب ليس قراءةً، قبل إرساله. |
+| `UserAgent` | `DomainNameAPI-DotNet/<version>` | ترويسة `User-Agent`. |
+
+تقرأ `FromEnvironment()` ما يلي:
+
+| المتغير | المعنى |
+|---|---|
+| `DNA_RESELLER_ID`, `DNA_API_KEY` | بيانات الاعتماد. |
+| `DNA_ENV` | `production` أو `ote` (وأيضًا `prod` و`live` و`test` و`sandbox`). |
+| `DNA_TEST_MODE` | القيم `true` أو `1` أو `on` أو `yes` تختار OTE. تُستخدم عند عدم ضبط `DNA_ENV`. |
+| `DNA_BASE_URL` | تجاوز اختياري للعنوان الأساسي. |
+| `DNA_READ_ONLY` | القيمة `true` تفعّل وضع القراءة فقط. |
+
+العميل آمن للاستخدام من عدة خيوط (thread-safe). أنشئ عميلًا واحدًا لكل مجموعة بيانات اعتماد، وأعد استخدامه طوال عمر التطبيق.
+
+<a id="usage"></a>
+
+## الاستخدام
+
+لكل مجال في API عميله الخاص. تأخذ الدوال وسائط بسيطة؛ ولخيارات أكثر، لكل دالة أيضًا
+نسخة محمّلة (overload) أو دالة شقيقة تأخذ كائن الطلب.
+
+<a id="account"></a>
+
+### الحساب
+
+</div>
+
+```csharp
+var account = await client.Account.GetAsync();             // ResellerId, ResellerName, TryBalance, UsdBalance
+
+// This month's charges, across all pages
+var request = new ListTransactionsRequest
+{
+    ChargeType = ChargeType.Subtract,
+    StartDate = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero),
+    TransactionTypes = { TransactionType.Register, TransactionType.Renew },
+};
+await foreach (var transaction in client.Account.ListAllTransactionsAsync(request))
+{
+    Console.WriteLine($"{transaction.CreationTime:d} {transaction.Type} {transaction.Amount} {transaction.AmountCurrency}");
+}
+```
+
+<div dir="rtl">
+
+<a id="domains"></a>
+
+### النطاقات
+
+**البحث**
+
+</div>
+
+```csharp
+var one = await client.Domains.SearchAsync("example.com", currency: "USD");
+bool available = one.Info?.IsAvailable == true;
+
+var many = await client.Domains.BulkSearchAsync(["example.com", "example.net", "example.com.tr"]);
+foreach (var domain in many.Available)
+{
+    Console.WriteLine($"{domain.DomainName}: {domain.Price} {domain.Currency}");
+}
+```
+
+<div dir="rtl">
+
+**القوائم والتفاصيل**
+
+</div>
+
+```csharp
+var page = await client.Domains.ListAsync(new ListDomainsRequest { MaxResultCount = 50, Statuses = { DomainStatus.Active } });
+
+await foreach (var domain in client.Domains.ListAllAsync(new ListDomainsRequest { DomainName = "example" }))
+{
+    Console.WriteLine($"{domain.DomainName} {domain.Status} {domain.ExpirationDate:d}");
+}
+
+var details = await client.Domains.GetAsync("example.com");
+Console.WriteLine(details.AuthCode);
+Console.WriteLine(details.GetContact(ContactType.Registrant)?.Email);
+```
+
+<div dir="rtl">
+
+**التسجيل والتجديد والنقل والاستعادة** (تخصم من رصيدك)
+
+</div>
+
+```csharp
+// One contact for all four roles
+await client.Domains.RegisterAsync("example.com", contact, ["tr.apiname.com", "eu.apiname.com"], years: 2);
+
+// Full control: different contacts per role, registry attributes, trustee service
+await client.Domains.RegisterAsync(new RegisterDomainRequest("example.com.tr")
+{
+    Period = 1,
+    NameServers = { "tr.apiname.com", "eu.apiname.com" },
+    Contacts = DomainContact.ForAllRoles(contact),
+    TldAttributes = new() { ["<key>"] = "<value>" },   // the keys: (await client.Products.GetTldAsync("com.tr"))!.Attributes
+});
+
+// With existing contact handles
+await client.Domains.RegisterWithHandleAsync("example.com", "DNA-12345", ["tr.apiname.com", "eu.apiname.com"]);
+
+var renewal = await client.Domains.CheckRenewalAsync("example.com");   // free
+if (renewal.IsRenewable)
+{
+    await client.Domains.RenewAsync("example.com", years: 1);
+}
+
+var check = await client.Domains.CheckTransferAsync("example.com", "EPP-CODE");  // free
+if (check.IsTransferable)
+{
+    await client.Domains.TransferAsync("example.com", "EPP-CODE");
+}
+
+await client.Domains.RestoreAsync("example.com");
+```
+
+<div dir="rtl">
+
+تُفحص الطلبات قبل إرسالها. التسجيل دون أدوار جهات الاتصال الأربعة جميعها، أو جهة اتصال بلا عنوان بريد إلكتروني،
+أو مدة 0 سنة، يُطلق `ArgumentException`، ولا يصل شيء إلى API.
+
+**الإعدادات**
+
+</div>
+
+```csharp
+await client.Domains.LockAsync("example.com");
+await client.Domains.UnlockAsync("example.com");
+await client.Domains.SetPrivacyProtectionAsync("example.com", enabled: true);
+await client.Domains.SetNameServersAsync("example.com", ["ns1.example.net", "ns2.example.net"]);
+await client.Domains.SetNameServersAsync("example.com", ["ns1.example.net"], DnssecMode.DisableDnssec);  // a signed domain
+var authCode = await client.Domains.UpdateAuthCodeAsync("example.com");
+
+await client.Domains.UpdateContactsAsync("example.com", DomainContact.ForAllRoles(contact));
+await client.Domains.SetContactHandlesAsync("example.com", [new ContactHandle(ContactType.Tech, "DNA-12345")]);
+```
+
+<div dir="rtl">
+
+**إعادة توجيه URL وخوادم الأسماء الفرعية والمستندات**
+
+</div>
+
+```csharp
+await client.Domains.Forwarding.SetAsync("example.com", "https://www.example.net", ForwardType.Standard);
+var forwarding = await client.Domains.Forwarding.GetAsync("example.com");
+await client.Domains.Forwarding.DeleteAsync("example.com");
+
+// The IP version of each address is detected
+await client.Domains.ChildNameServers.AddAsync("example.com", "ns1.example.com", "192.0.2.10", "2001:db8::10");
+await client.Domains.ChildNameServers.UpdateAsync("example.com", "ns1.example.com", ["192.0.2.20"]);
+await client.Domains.ChildNameServers.DeleteAsync("example.com", "ns1.example.com");
+
+// Registry documents (mostly .tr)
+await client.Domains.Documents.UploadAsync("example.com.tr", [DocumentUpload.FromFile(DocumentType.IdentityCard, "id.pdf")]);
+await foreach (var document in client.Domains.Documents.ListAllAsync("example.com.tr"))
+{
+    Console.WriteLine($"{document.Name}: {document.Status}");
+}
+```
+
+<div dir="rtl">
+
+<a id="contacts"></a>
+
+### جهات الاتصال
+
+معرّفات جهات الاتصال (handles) هي جهات اتصال قابلة لإعادة الاستخدام. أنشئ واحدة مرة واحدة واستخدمها لنطاقات كثيرة.
+
+</div>
+
+```csharp
+var created = await client.Contacts.CreateAsync(contact);
+string handle = created.Handle!;                          // for example DNA-12345
+
+var details = await client.Contacts.GetAsync(handle);     // the contact and its verification state
+var result = await client.Contacts.UpdateAsync(handle, contact);
+Console.WriteLine($"{result.Stats?.SuccessCount} of {result.Stats?.TotalDomainCount} domains updated");
+
+var verifications = await client.Contacts.GetVerificationAsync(handle);
+await client.Contacts.ResendVerificationAsync(handle);
+```
+
+<div dir="rtl">
+
+<a id="dns"></a>
+
+### DNS
+
+سجلات المنطقة (zone) للنطاقات الموجودة على خوادم أسماء المنصة. تُحَلّ السجلات علنًا بمجرد أن يستخدم النطاق تلك الخوادم،
+وهذا ما تتولاه `ApplyAsync`.
+
+</div>
+
+```csharp
+var sets = await client.Dns.ListAsync("example.com");
+foreach (var set in sets)
+{
+    Console.WriteLine($"{set.Name} {set.Type} {set.Ttl} {string.Join(", ", set.Values)}");
+}
+
+await client.Dns.AddAsync("example.com", "www", RecordType.A, "192.0.2.10");
+await client.Dns.AddAsync("example.com", "@", "txt", "v=spf1 include:_spf.example.net ~all");   // "txt" becomes TXT
+await client.Dns.AddAsync("example.com", "@", RecordType.MX, ["10 mx1.example.net", "20 mx2.example.net"], ttl: 3600);
+await client.Dns.ReplaceAsync("example.com", "www", RecordType.A, ["192.0.2.20"], ttl: 300);
+await client.Dns.DeleteAsync("example.com", "www", RecordType.A, "192.0.2.20");
+
+var applied = await client.Dns.ApplyAsync("example.com");
+```
+
+<div dir="rtl">
+
+تفحص الحزمة ما سترفضه API: سجل CNAME عند الجذر (apex)، أو قيمة CAA ناقصة الأجزاء الثلاثة، أو TTL خارج النطاق
+1–86400. تُباعَد استدعاءات المنطقة بثانية واحدة، وهي حدّ البوابة.
+
+<a id="dnssec"></a>
+
+### DNSSEC
+
+</div>
+
+```csharp
+var info = await client.Dnssec.GetAsync("example.com");   // Status, DsRecords, AllowedAlgorithms, ...
+
+var record = DsRecordData.Parse("12345 13 2 49FD46E6C4B45C55D4AC69CBD3CD34AC1AFE51DE");
+await client.Dnssec.AddAsync("example.com", record);
+await client.Dnssec.RemoveAsync("example.com", record);
+await client.Dnssec.DisableAsync("example.com");          // removes every DS record
+```
+
+<div dir="rtl">
+
+<a id="ssl"></a>
+
+### SSL
+
+</div>
+
+```csharp
+// 1. Buy (charges the balance). Product codes come from client.Products.ListSslProductsAsync().
+var order = await client.Ssl.PurchaseAsync("example.com", "PKG-CODE");
+
+// 2. A CSR and private key, if you do not have one
+var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com")
+{
+    Country = "TR", State = "Istanbul", Locality = "Istanbul", Organization = "Example Ltd", OrganizationUnit = "IT",
+});
+
+// 3. Configure: CSR, validation method and contact
+var approvers = await client.Ssl.GetApproverEmailsAsync("example.com");
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", csr.Csr!, certificateContact)
+{
+    ValidationMethod = ValidationMethod.Email,
+    ApproverEmail = approvers[0],
+    WebServerType = WebServerType.Apache,
+});
+
+// 4. Wait for issuance, then download
+var status = await client.Ssl.RefreshStatusAsync("example.com");
+if (status.IsIssued)
+{
+    var content = await client.Ssl.GetContentAsync("example.com");
+    File.WriteAllText("fullchain.pem", content.FullChain);
+}
+
+await client.Ssl.ReissueAsync(new ReissueCertificateRequest("example.com") { Csr = newCsr, PrivateKey = newKey });
+await client.Ssl.RevokeAsync("example.com");              // cannot be undone
+```
+
+<div dir="rtl">
+
+<a id="hosting"></a>
+
+### الاستضافة
+
+</div>
+
+```csharp
+var packages = await client.Hosting.ListPackagesAsync();
+var created = await client.Hosting.CreateAsync("example.com", "starter-linux");   // charges the balance
+var status = await client.Hosting.GetStatusAsync("example.com");                   // panel access once ready
+var hosting = await client.Hosting.GetAsync("example.com");
+var plans = await client.Hosting.ListPlansAsync();
+```
+
+<div dir="rtl">
+
+<a id="orders-and-products"></a>
+
+### الطلبات والمنتجات
+
+</div>
+
+```csharp
+var order = await client.Orders.GetAsync("ORDER-CODE");
+
+var com = await client.Products.GetTldAsync("com");
+Console.WriteLine($"{com?.GetRegistrationPrice(1)?.Price} {com?.GetRegistrationPrice(1)?.Currency}, DNSSEC: {com?.SupportsDnssec}");
+
+await foreach (var tld in client.Products.ListAllTldsAsync(new ListTldsRequest { Currency = "USD" }))
+{
+    Console.WriteLine(tld.Name);
+}
+
+var price = await client.Products.GetPriceAsync("com", OrderType.Renew, years: 1);
+var ssl = await client.Products.ListSslProductsAsync(new ListSslProductsRequest { IsWildcard = true });
+```
+
+<div dir="rtl">
+
+<a id="requests-and-baserequest"></a>
+
+## الطلبات و`BaseRequest`
+
+كل عملية هي فئة طلب، مثل `RenewDomainRequest` أو `ListDomainsRequest` أو `AddDnsRecordRequest`.
+تبنيها لك دوال العميل المذكورة أعلاه، ويمكنك أيضًا إنشاؤها وإرسالها بنفسك:
+
+</div>
+
+```csharp
+var request = new RenewDomainRequest("example.com", period: 2);
+Console.WriteLine($"{request} is {request.Safety}");   // "POST domains/renew is Billable"
+
+DomainOperationResult result = await client.SendAsync(request);
+
+// The same, with the HTTP details: correlation ID, soft-quota state, attempts, duration
+var response = await client.SendWithResponseAsync(request);
+Console.WriteLine($"{response.CorrelationId} quota {response.Quota?.Used}/{response.Quota?.Limit}");
+```
+
+<div dir="rtl">
+
+تشتق جميع الطلبات من إحدى ثلاث فئات أساسية:
+
+| الفئة الأساسية | الغرض |
+|---|---|
+| `BaseRequest` | العمليات التي لا تُعيد شيئًا (قفل، فك القفل، إضافة سجل DNS، ...). |
+| `BaseRequest<TResponse>` | العمليات التي تُعيد بيانات. |
+| `PagedRequest<TItem>` | عمليات القوائم. تضيف `SkipCount` و`MaxResultCount` و`Sorting`، وتعمل مع `ListAllAsync`. |
+
+يصف الطلبُ نفسه عبر بضع دوال مُعاد تعريفها (overrides). في POST وPUT يكون كائن الطلب نفسه هو جسم JSON (بصيغة camelCase،
+مع حذف القيم null). تُضاف معاملات الاستعلام في `AddQueryParameters`، وتوضع الفحوص التي تسبق الإرسال في `Validate`.
+لاستدعاء نقطة نهاية لا تغطيها الحزمة بعد، اكتب طلبك الخاص:
+
+</div>
+
+```csharp
+public sealed class GetDomainNotesRequest : BaseRequest<DomainNotes>
+{
+    public GetDomainNotesRequest(string domainName) => DomainName = domainName;
+
+    public string DomainName { get; }
+
+    public override HttpMethod Method => HttpMethod.Get;
+    public override string Path => "domains/notes";              // below /api/v1/
+    public override OperationSafety Safety => OperationSafety.Read;
+
+    protected override void AddQueryParameters(QueryParameters query) => query.Add("DomainName", DomainName);
+    protected override void Validate() => Require(DomainName, nameof(DomainName));
+}
+
+var notes = await client.SendAsync(new GetDomainNotesRequest("example.com"));
+```
+
+<div dir="rtl">
+
+يحصل طلبك على كل ما تحصل عليه الطلبات المدمجة: بيانات الاعتماد، وإعادة المحاولة بحسب فئة الأمان، وتنظيم وتيرة الطلبات، ووضع القراءة فقط،
+ومعالجة الأخطاء. أعد تعريف `GetBody()` عندما تتوقع API شكلًا مختلفًا للجسم، وأعد تعريف `IsIdempotent` عندما
+يكون تكرار عملية الكتابة آمنًا.
+
+<a id="errors"></a>
+
+## الأخطاء
+
+كل طلب فاشل يُطلق `DomainNameApiException`. أما الوسائط غير الصالحة فتُطلق `ArgumentException` قبل إرسال أي شيء.
+
+</div>
+
+```csharp
+try
+{
+    await client.Domains.RenewAsync("example.com");
+}
+catch (DomainNameApiException e) when (e.Kind == ApiErrorKind.Validation)
+{
+    Console.WriteLine($"{e.Code}: {e.Message}");          // Dna.DomainService:Domain:10007: ...
+    foreach (var field in e.ValidationErrors)
+    {
+        Console.WriteLine($"  {field}");
+    }
+}
+catch (DomainNameApiException e) when (e.OutcomeUnknown)
+{
+    // A billable or changing request failed on the network: it may have reached the API.
+    // Check the state before sending it again.
+    var details = await client.Domains.GetAsync("example.com");
+}
+```
+
+<div dir="rtl">
+
+| الخاصية | المعنى |
+|---|---|
+| `Kind` | تصنيف ثابت (الجدول أدناه). اتخذ قراراتك بناءً عليه، لا على الرسالة. |
+| `Code` | رمز الخطأ من API (مثل `Dna.DomainService:Domain:10007`)، أو أحد رموز الحزمة أدناه. |
+| `Message` | ما الذي حدث. تُستبدل الرسائل الجاهزة العامة بتفاصيل API. |
+| `StatusCode` | حالة HTTP، أو null إن لم تصل أي إجابة. |
+| `Details`, `ValidationErrors` | تفاصيل إضافية ومشكلات على مستوى الحقول من API. |
+| `CorrelationId` | قيمة `X-Correlation-Id` من البوابة. اذكرها عند التواصل مع الدعم. |
+| `Hint` | اقتراح قصير بما يجب فعله بعد ذلك. |
+| `IsRetryable` | هل يمكن أن ينجح تكرار الطلب نفسه لاحقًا. |
+| `OutcomeUnknown` | فشل طلب يُغيّر شيئًا بسبب الشبكة، فقد يكون قد نُفّذ. |
+| `Operation`, `Safety` | الطلب الفاشل (`POST domains/renew`) وفئة الأمان الخاصة به. |
+| `RetryAfter`, `ResponseBody` | قيمة `Retry-After` من البوابة والإجابة الخام. |
+
+| `Kind` | متى |
+|---|---|
+| `Authentication` | بيانات اعتماد خاطئة أو مفقودة، أو موزّع غير معروف أو موقوف في هذه البيئة (401، إعادة توجيه). |
+| `Forbidden` | مصادَق عليه لكن غير مسموح له (403). |
+| `NotFound` | النطاق أو جهة الاتصال أو الطلب أو أي مورد آخر غير موجود (404). |
+| `Validation` | رفضت API المدخلات أو فشلت قاعدة عمل: حقل غير صالح، أو نطاق مقفل، أو رصيد غير كافٍ (400، 422). |
+| `Conflict` | حالة المورد لا تسمح بالعملية (409). |
+| `RateLimited` | ما زال الطلب محدودًا بمعدل الطلبات بعد إعادة المحاولة التلقائية (429). |
+| `Server` | فشل من جهة الخادم (5xx). غالبًا مؤقت. |
+| `Network`, `Timeout` | لا إجابة: DNS أو TLS أو وكيل (proxy) أو إعادة ضبط الاتصال، أو لا إجابة خلال `Timeout`. |
+| `ReadOnly` | مُنع بسبب وضع القراءة فقط؛ ولم يُرسَل شيء. |
+| `Unknown` | أي حالة أخرى، بما فيها إجابة لم تستطع الحزمة قراءتها. |
+
+الرموز التي تضبطها الحزمة بنفسها:
+
+| الرمز | المعنى |
+|---|---|
+| `INVALID_RESELLER` | أعادت البوابة التوجيه إلى صفحة الإيقاف: معرّف الموزّع غير معروف أو غير نشط أو موقوف **في هذه البيئة**. |
+| `INVALID_API_KEY` | المفتاح لا يطابق الموزّع. مفاتيح الإنتاج وOTE مختلفة. |
+| `MISSING_API_KEY`, `MISSING_RESELLER_ID`, `NO_CREDENTIALS` | إحدى بيانات الاعتماد فارغة. |
+| `SUBRESELLER_NOT_ALLOWED` | لا يمكن لحسابات الموزّعين الفرعيين استخدام API. استخدم بيانات اعتماد الموزّع الرئيسي. |
+| `UNAUTHORIZED` | أي 401 آخر. |
+| `RATE_LIMITED` | 429 بعد إعادة المحاولة. |
+| `NETWORK`, `TIMEOUT` | لم تصل أي إجابة. |
+| `READ_ONLY` | مُنع بسبب وضع القراءة فقط. |
+| `EMPTY_RESPONSE`, `INVALID_RESPONSE` | كانت الإجابة الناجحة فارغة أو تعذّرت قراءتها. |
+| `HTTP_<status>` | لم ترسل API رمز خطأ. |
+
+<a id="safety-retries-and-rate-limits"></a>
+
+## الأمان وإعادة المحاولة وحدود معدل الطلبات
+
+لكل طلب فئة أمان، وهي نفسها التي تستخدمها أداة `dna` CLI:
+
+| `OperationSafety` | تعني | أمثلة |
+|---|---|---|
+| `Read` | بلا آثار جانبية، حتى لو استخدمت API الأسلوب POST أو PUT | البحث، التفاصيل، القوائم، فحوص التجديد والنقل، إنشاء CSR |
+| `Write` | تغيير مجاني يمكن التراجع عنه | سجلات DNS، القفل، الخصوصية، خوادم الأسماء، جهات الاتصال |
+| `Billable` | يخصم من رصيدك | التسجيل، التجديد، النقل، الاستعادة، شراء SSL، طلب استضافة |
+| `Destructive` | يحذف شيئًا أو يصعب التراجع عنه | حذف سجل DNS، إزالة DNSSEC، إلغاء شهادة |
+
+- **وضع القراءة فقط** (‏`ReadOnly = true` أو `DNA_READ_ONLY=true`) يمنع كل ما ليس `Read` قبل إرساله.
+  استخدمه أثناء الاستكشاف، وفي التقارير ولوحات المعلومات.
+- **إعادة المحاولة.** تُعاد محاولة إجابات 429 دائمًا، مع احترام `Retry-After`. وهذا آمن حتى للطلبات المدفوعة، لأن
+  البوابة ترفضها قبل تنفيذ أي شيء. أما أخطاء الشبكة والمهلات وإجابات 502/503/504 فتُعاد محاولتها لعمليات القراءة فقط
+  (ولعمليات الكتابة التي يكون تكرارها آمنًا، مثل استبدال خوادم الأسماء). لا يُرسَل التسجيل أو التجديد مرتين أبدًا.
+- **تنظيم وتيرة الطلبات.** تسمح البوابة بـ 5 طلبات في الثانية لكل مفتاح، و2 في الثانية لعمليات البحث عن النطاقات، و20 في الثانية
+  لاستدعاءات منطقة DNS. يباعد العميل بين الطلبات ليبقى ضمن هذه الحدود (وبين استدعاءات المنطقة بثانية واحدة). معلومات النطاق وقائمة
+  TLD غير محدودتين بمعدل الطلبات.
+- **الحصة المرنة (soft quota).** تكلّف عمليات البحث والاستعلام عن المعلومات نقطة واحدة، وكل ما عداها 10 نقاط. بعد تجاوز 200 نقطة تبطئ البوابة كل
+  طلب بما يصل إلى 5 ثوانٍ؛ وتتناقص النقاط بنسبة 20% في الدقيقة. تعرض `SendWithResponseAsync` الحالة في `Quota`.
+
+<a id="dependency-injection"></a>
+
+## حقن التبعيات
+
+يعمل `DomainNameApiClient` كـ `HttpClient` مكتوب بنوع صريح (typed):
+
+</div>
+
+```csharp
+builder.Services.AddSingleton(new DomainNameApiOptions
+{
+    ResellerId = builder.Configuration["DomainNameApi:ResellerId"]!,
+    ApiKey = builder.Configuration["DomainNameApi:ApiKey"]!,
+    Environment = ApiEnvironment.Ote,
+});
+builder.Services.AddHttpClient<DomainNameApiClient>();
+
+// Then inject it
+public sealed class RenewalService(DomainNameApiClient dna)
+{
+    public Task<DomainOperationResult> RenewAsync(string domain) => dna.Domains.RenewAsync(domain);
+}
+```
+
+<div dir="rtl">
+
+لا تتبع الحزمة أي عمليات إعادة توجيه على `HttpClient` الخاص بها. أما العميل الذي ينشئه المصنع (factory) فقد يتبعها؛ وتظل الحزمة تتعرف
+على صفحة الإيقاف في البوابة وتُبلغ بالخطأ `INVALID_RESELLER`.
+
+<a id="testing-your-code"></a>
+
+## اختبار شيفرتك
+
+مرّر `HttpClient` مع معالج وهمي (stub handler) لاختبار الشيفرة التي تستخدم الحزمة دون استدعاء API:
+
+</div>
+
+```csharp
+sealed class StubHandler(string json) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+        Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+}
+
+var client = new DomainNameApiClient(
+    new HttpClient(new StubHandler("""{"resellerName":"Test","usdBalance":10}""")),
+    new DomainNameApiOptions { ResellerId = "test", ApiKey = "test", PaceRequests = false });
+
+var account = await client.Account.GetAsync();   // UsdBalance == 10
+```
+
+<div dir="rtl">
+
+للاختبار على API الحقيقية، استخدم OTE بمفتاحها الخاص.
+
+<a id="project-layout"></a>
+
+## بنية المشروع
+
+</div>
+
+```
+src/DomainNameApi/
+├── DomainNameApiClient.cs        The entry point: sub-clients, SendAsync, retries, pacing
+├── DomainNameApiOptions.cs       Settings and FromEnvironment()
+├── Core/                         BaseRequest, PagedRequest, QueryParameters, errors, responses, shared enums
+├── Internal/                     JSON settings, error parsing, the rate-limit pacer
+├── Accounts/   AccountClient     Balances and transactions
+├── Contacts/   ContactsClient    Contact handles
+├── Domains/    DomainsClient     Domains, plus Forwarding, ChildNameServers and Documents
+├── Dns/        DnsClient         Zone records
+├── Dnssec/     DnssecClient      DS records
+├── Ssl/        SslClient         Certificates
+├── Hosting/    HostingClient     Hosting packages and services
+├── Orders/     OrdersClient      Orders
+└── Products/   ProductsClient    TLDs, SSL products and prices
+```
+
+<div dir="rtl">
+
+لكل مجلد مجال الشكل نفسه: `XxxClient.cs`، ومجلد `Requests/` فيه فئة واحدة لكل عملية، ومجلد `Models/`
+فيه الإجابات والقيم المُعدَّدة (enums). تشترك جميع أنواع المجال في مساحة أسماء (namespace) واحدة، مثل `DomainNameApi.Domains`.
+
+<a id="development"></a>
+
+## التطوير
+
+</div>
 
 ```bash
+dotnet build
 dotnet test
 ```
 
-في حال عدم توفر .NET SDK محليًا، شغّلها داخل Docker:
+<div dir="rtl">
 
-```bash
-docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
-```
+لا تستدعي الاختبارات API الحقيقية أبدًا: فهي تستخدم `HttpMessageHandler` وهميًا. على Windows تعمل على .NET 10 وعلى
+.NET Framework 4.8؛ والأخير يختبر إصدار .NET Standard 2.0.
 
-| ملف الاختبار | الوصف |
-|-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | يعيد تشغيل جميع ملفات المطابقة الـ 134 الخاصة بـ php-dna ‏(`testdata/conformance/`) ويقارن الطلبات والنتائج |
-| `tests/DomainNameApi.Tests/HttpLayerTests.cs` | الترويسات، وعناوين URL، وسلاسل الاستعلام، ووضع الاختبار، والمهلات الزمنية، وتنظيم وتيرة طلبات المنطقة |
-| `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | طبقة النقل الافتراضية `HttpClient` مقابل مستمع محلي |
-| `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | ربط أخطاء البوابة ورسائل التحقق من الصحة |
-| `tests/DomainNameApi.Tests/TelemetryTests.cs` | حمولات القياس عن بُعد، وحجب بيانات الاعتماد، والوضع المصغّر |
-| `tests/DomainNameApi.Tests/UtilityTests.cs` | التحقق من جهات الاتصال، وتوحيد صيغ الهاتف/الدولة، والتنسيق المتوافق مع PHP |
+الملف `tests/DomainNameApi.Tests/testdata/openapi.json` هو وثيقة API التي تضمّنها أداة `dna` CLI. يتحقق `SpecCoverageTests`
+من أن لكل عملية فيه فئة طلب واحدة بالضبط بفئة الأمان نفسها في CLI. عندما تضيف API عملية جديدة،
+حدّث الوثيقة، وسيفشل الاختبار إلى أن يوجد الطلب.
 
-<hr style="border: 4px solid #000; border-style: dashed;">
+<a id="upgrading-from-1x"></a>
 
-## رموز العودة والأخطاء مع تفسيراتها
+## الترقية من 1.x
 
-| الرمز | الوصف | التفاصيل |
-|------|------|------|
-| 1000 | تم تنفيذ الأمر بنجاح | العملية ناجحة. |
-| 1001 | تم تنفيذ الأمر بنجاح؛ الإجراء معلّق | العملية ناجحة. إلا أن العملية حاليًا في قائمة الانتظار لإكمالها. |
-| 2003 | مُعامِل مطلوب مفقود | خطأ مُعامِل مفقود. على سبيل المثال، عدم إدخال رقم الهاتف في معلومات الاتصال. |
-| 2105 | الكائن غير مؤهل للتجديد | حالة النطاق غير مناسبة للتجديد، فهو مقفل أمام عمليات التحديث. يجب ألا تكون الحالة "clientupdateprohibited". قد يعود ذلك إلى حالات أخرى. |
-| 2200 | خطأ في المصادقة | خطأ في التفويض، رمز الأمان غير صحيح أو النطاق مسجل لدى مسجّل آخر. |
-| 2302 | الكائن موجود | اسم النطاق أو معلومات خادم الأسماء موجودة مسبقًا في قاعدة البيانات. لا يمكن التسجيل. |
-| 2303 | الكائن غير موجود | اسم النطاق أو معلومات خادم الأسماء غير موجودة في قاعدة البيانات. يلزم تسجيل جديد. |
-| 2304 | حالة الكائن تمنع العملية | حالة النطاق غير مناسبة للتحديث، فهو مقفل أمام عمليات التحديث. يجب ألا تكون الحالة "clientupdateprohibited". قد يعود ذلك إلى حالات أخرى. |
+الإصدار 2.0 حزمة SDK جديدة. كان الإصدار 1.x نسخة منقولة من مكتبة PHP ويُعيد أغلفة `JsonNode` غير مكتوبة بأنواع؛ أما 2.0 فيعتمد
+طلبات ونماذج مكتوبة بأنواع صريحة، ودوالَّ غير متزامنة، واستثناءات.
 
-| الرمز | التفاصيل |
-|------|------|
-| 101  | خطأ في النظام، التفاصيل لـ ({0})! |
-| 102  | أخطاء متعددة، التفاصيل لـ ({0})! |
-| 103  | أخطاء غير معروفة، التفاصيل لـ ({0})! |
-| 200  | أمر API غير موجود ({0})! |
-| 210  | خدمة API غير موجودة ({0})! |
-| 211  | لم يتم تعيين مزود خدمة API! |
-| 300  | الموزع غير موجود! |
-| 301  | عنوان IP الحالي الخاص بك غير مخوّل بالوصول. يرجى التأكد من أنك تتصل من عنوان IP مخوّل ثم المحاولة مرة أخرى |
-| 310  | امتداد النطاق (TLD) غير مدعوم! |
-| 320  | API غير موجود! |
-| 321  | العملة غير مدعومة! |
-| 330  | لم يتم تعيين المُعامِلات المطلوبة ({0}). |
-| –    | تأكد من إرسال جميع كائنات جهات الاتصال كاملة |
-| 340  | تعريف السعر غير موجود ({0}[{1}]-{2}{3}). |
-| 350  | رصيد الموزع غير كافٍ. (معرّف الموزع : {0} - الرصيد الحالي : {1} {2}). |
-| 350  | عملة المحاسبة غير متطابقة أو الرصيد غير كافٍ. |
-| 360  | طلب API غير صالح للحقل ({0}). |
-| 360  | تم تجاوز حصة API! |
-| 361  | خطأ تقييد المعدل! |
-| 362  | النطاق المميز (Premium) غير متاح للتسجيل حاليًا. |
-| 363  | أُلغيت العملية لأن النطاق في فترة التجديد التلقائي |
-| 364  | هذا النطاق غير متاح حاليًا لإجراء المعاملات بسبب مشكلة لدى السجل (registry) |
+| 1.x | 2.0 |
+|---|---|
+| `new DomainNameApiClient(id, key, testMode: true)` | `new DomainNameApiClient(id, key, ApiEnvironment.Ote)` |
+| `dna.CheckAvailability(...)` | `client.Domains.SearchAsync(...)` / `BulkSearchAsync(...)` |
+| `dna.GetDetails(domain)` | `client.Domains.GetAsync(domain)` |
+| `dna.GetList()` | `client.Domains.ListAsync()` / `ListAllAsync()` |
+| `dna.RegisterWithContactInfo(...)` | `client.Domains.RegisterAsync(...)` |
+| `dna.Renew(domain, period)` | `client.Domains.RenewAsync(domain, years)` |
+| `dna.ModifyNameServer(...)` | `client.Domains.SetNameServersAsync(...)` |
+| `dna.AddChildNameServer(...)` | `client.Domains.ChildNameServers.AddAsync(...)` |
+| `dna.GetResourceRecords(domain)` | `client.Dns.ListAsync(domain)` |
+| `dna.AddResourceRecord(...)` | `client.Dns.AddAsync(...)` |
+| `dna.SetForwarding(...)` | `client.Domains.Forwarding.SetAsync(...)` |
+| `dna.GetCurrentBalance()` | `client.Account.GetAsync()` |
+| `result["result"] == "ERROR"` | `catch (DomainNameApiException e)` |
 
-| الرمز | التفاصيل |
-|------|------|
-| 400  | جهة اتصال غير صالحة ({0}). |
-| 401  | تتعذر مزامنة معلومات الاتصال. |
-| 402  | لا يوجد وصول إلى معلومات الاتصال من السجل. |
-| 403  | توجد معلومات ناقصة في النظام. أدخل معلوماتك الافتراضية أو تواصل مع فريق الدعم. |
-| 404  | يتعذر تحديث جهة اتصال النطاق. يلزم إذن من السجل. |
-| 410  | جهة الاتصال غير موجودة. |
-| 410  | جهة الاتصال غير موجودة ({0}). |
-| 420  | أمر Api غير صالح لجهة الاتصال {0}. |
-| 430  | واجهة API لجهات الاتصال غير موجودة. |
-| 440  | جهة الاتصال غير متزامنة. |
-| 450  | عدد جهات اتصال النطاق كبير جدًا! |
-| 451  | تعذّر متابعة تحديث جهة الاتصال. |
+كان الإصدار 1.x يرسل تقارير الأخطاء إلى Sentry. أما 2.0 فلا يرسل شيئًا إلى أي جهة سوى API.
 
-| الرمز | التفاصيل |
-|------|------|
-| 500  | معرّف النطاق غير صالح. |
-| 500  | معرّف النطاق غير صالح ({0}). |
-| 501  | تعذّرت مزامنة النطاق ({0}) |
-| 502  | فشل النقل الداخلي |
-| 503  | تسجيل النطاق غير متاح. |
-| 504  | معلومات النطاق غير متطابقة. القيمة السابقة: {0} |
-| 505  | أدخل عنوان IP. |
-| 506  | بدأ نقل النطاق ولكن تعذّرت قراءة معلومات الاتصال. |
-| 507  | خطأ في التفويض. |
-| 510  | النطاق غير موجود. |
-| 511  | لا يمكن العثور على النطاقات منتهية الصلاحية. |
-| 512  | النطاق غير قابل للتجديد. |
-| 513  | النطاق ليس في حالة قابلة للتحديث. يجب أن يكون نشطًا لكي يتم تحديثه |
-| 514  | يُتوقع أن يكون النطاق في فترة الاسترداد (Redemption). |
-| 520  | أمر Api غير صالح للنطاق "{0}". |
-| 530  | مدة النطاق غير صالحة. يجب أن تكون المدة من {0} إلى {1} سنوات. المدة المطلوبة هي {2} سنوات. |
-| 540  | لا يمكن تمديد النطاق لأكثر من {0} سنوات من التاريخ الحالي. |
-| 550  | اسم النطاق غير صالح. يجب أن يتراوح طول النطاق بين {0} و{1} حرفًا. طول اسم النطاق المطلوب هو {2} حرفًا. |
-| 560  | عدد خوادم الأسماء غير صالح. يجب أن يحتوي النطاق على {0} إلى {1} خوادم أسماء. عدد خوادم الأسماء المطلوب هو {2}. |
-| 561  | لم يتم العثور على معلومات خادم الأسماء في الطلب الوارد |
-| 570  | أسماء النطاقات الدولية (IDN) غير مدعومة للامتداد "{0}". |
-| 571  | المدة غير صالحة. |
-| 572  | الأمر غير صالح. |
-| 573  | لم يتم العثور على أسماء النطاقات. |
-| 574  | لم يتم العثور على أسماء امتدادات النطاقات (TLD). |
-| 575  | النطاق ليس في حالة قابلة للتحديث. يجب أن يكون نشطًا لكي يتم تحديث خوادم الأسماء |
-| 576  | يمكن تجديد النطاق خلال الشهر الأخير قبل تاريخ انتهاء الصلاحية |
-| 580  | النقل غير مدعوم للامتداد "{0}". |
-| 581  | خادم الأسماء الفرعي غير موجود |
-| 582  | بدأ النقل من قِبل موزع آخر. |
-| 583  | لم تتم تهيئة النقل. يرجى التواصل مع فريق الدعم. |
-| 584  | حالة الكائن تمنع العملية |
-| 590  | رمز التفويض مطلوب لهذا النقل. |
-| 591  | رمز التفويض غير صالح. |
-| 592  | يوجد قفل نقل على النطاق. |
-| 593  | لا يمكن نقل النطاق، يجب أن تستوفي معلومات الحالة وقفل النقل المعايير المطلوبة. (معلومات الحالة: #ok) |
-| 594  | تعذّر حل عنوان خادم أسماء النطاق ({0}) |
-| 595  | تتعذر قراءة معلومات الاتصال (whois.registrar.tld). يرجى التأكد من أن حالة حماية الخصوصية مفتوحة |
-| 596  | تعذّر التحقق من معلومات الاتصال |
-| 597  | امتداد النطاق (TLD) غير موجود |
-| 598  | حدث خطأ غير معروف |
-| 599  | إعادة توجيه النطاق غير موجودة |
+## الروابط
+
+- [`dna` CLI وخادم MCP](https://github.com/domainreseller/cli): API نفسها من الطرفية ومن وكلاء الذكاء الاصطناعي.
+- [توثيق API](https://www.domainnameapi.com/docs/)
+- [سجل التغييرات](CHANGELOG.md)
 
 ## الترخيص
 
-Apache License 2.0 — انظر [LICENSE](LICENSE).
+Apache License 2.0. راجع [LICENSE](LICENSE).
+
+</div>

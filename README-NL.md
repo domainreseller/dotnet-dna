@@ -10,1057 +10,707 @@
   <a href="README-IT.md"> | IT <img style="padding-top: 8px" src="https://raw.githubusercontent.com/yammadev/flag-icons/master/png/IT.png" alt="IT" height="20" /></a>
 </div>
 
-# DomainNameAPI .NET-bibliotheek (dotnet-dna)
+# DomainNameAPI .NET SDK (dotnet-dna)
 
-De officiële .NET-client voor de reseller-REST-API van DomainNameAPI: domeinen zoeken, registreren, verlengen, transfers, contacten, nameservers, child nameservers, DNS-zones en URL-doorsturing.
+<p>
+  <a href="https://github.com/domainreseller/dotnet-dna/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/domainreseller/dotnet-dna/ci.yml?branch=main&label=CI&style=flat-square" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-0B8DB5?style=flat-square" alt="Apache-2.0"></a>
+</p>
 
-dotnet-dna is een getrouwe port van [php-dna](https://github.com/domainreseller/php-dna): dezelfde methoden, dezelfde verzoeken over de lijn en dezelfde retourwaarden. De bibliotheek wordt getoetst aan de conformiteitsfixtures van php-dna (134 scenario's), zodat code die voor de PHP-bibliotheek is geschreven één op één over te zetten is.
+De officiële .NET SDK voor het resellerplatform van [Domain Name API](https://www.domainnameapi.com). Hij dekt alle
+64 operaties van de REST API met getypeerde clients en modellen: domeinen, contacten, DNS, DNSSEC, SSL-certificaten,
+hosting, bestellingen, producten en je account.
 
-## 📦 Download — gebruik altijd de Releases!
+```csharp
+using var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Ote);
 
-⬇️ **Download hier de nieuwste geteste versie: https://github.com/domainreseller/dotnet-dna/releases/latest**
+var search = await client.Domains.SearchAsync("example.com");
+if (search.Info?.IsAvailable == true)
+{
+    await client.Domains.RegisterAsync("example.com", contact, ["tr.apiname.com", "eu.apiname.com"]);
+}
+```
 
-> ⚠️ Gebruik **niet** de groene knop **Code → Download ZIP** — daarmee downloadt u de ruwe ontwikkelbranch. Releasepakketten zijn voorzien van een versienummer, getest en klaar voor productie.
+- **Alles getypeerd.** Elke operatie is een requestklasse en elk antwoord een model met IntelliSense-documentatie. Geen dictionaries, geen JSON-parsing.
+- **Je eigen requests.** Elk request erft van `BaseRequest`. Maak een subklasse voor een endpoint dat de SDK nog niet dekt.
+- **Veilig met geld.** Elk request geeft aan of het leest, schrijft, je saldo belast of iets verwijdert. Billable requests worden nooit herhaald en een read-only modus blokkeert elke wijziging.
+- **Ingebouwde veerkracht.** Rate limits worden automatisch gerespecteerd, 429-antwoorden worden herhaald en netwerkfouten worden herhaald bij leesacties.
+- **Duidelijke fouten.** Eén uitzonderingstype met een vaste soort, de foutcode van de API, validatiefouten per veld, de correlation ID en een hint.
+- **Modern .NET.** Async met annulering, automatische paginering met `IAsyncEnumerable`, ondersteuning voor `IHttpClientFactory`, nullable-annotaties.
+- **Draait overal.** .NET 10 en elke runtime die .NET Standard 2.0 ondersteunt (.NET Framework 4.6.2+, .NET 8, Mono, Unity).
 
-## Installatie- en integratiehandleiding
+Het is de .NET-tegenhanger van [`dna`, de Domain Name API CLI](https://github.com/domainreseller/cli): hetzelfde API-document,
+dezelfde veiligheidsklassen, retryregels en foutcodes.
 
-### Minimale vereisten
+## Inhoud
 
-- .NET 10 of hoger, **of** elke runtime die .NET Standard 2.0 ondersteunt (.NET Framework 4.6.2+, .NET Core 2.0+, Mono, Xamarin, Unity).
-- Geen afhankelijkheden van derden. De bibliotheek gebruikt `HttpClient` en `System.Text.Json` (onder .NET Standard 2.0 wordt het pakket `System.Text.Json` automatisch meegenomen).
+- [Installatie](#install)
+- [Inloggegevens](#credentials)
+- [Snel aan de slag](#quick-start)
+- [Configuratie](#configuration)
+- [Gebruik](#usage): [account](#account) · [domeinen](#domains) · [contacten](#contacts) · [DNS](#dns) · [DNSSEC](#dnssec) · [SSL](#ssl) · [hosting](#hosting) · [bestellingen en producten](#orders-and-products)
+- [Requests en `BaseRequest`](#requests-and-baserequest)
+- [Fouten](#errors)
+- [Veiligheid, retries en rate limits](#safety-retries-and-rate-limits)
+- [Dependency injection](#dependency-injection)
+- [Je code testen](#testing-your-code)
+- [Projectindeling](#project-layout)
+- [Ontwikkeling](#development)
+- [Upgraden van 1.x](#upgrading-from-1x)
 
-### Installatie
+<a id="install"></a>
 
-**A) NuGet-pakket** — de pakket-id is `DomainNameApi`. Elke release bevat het `.nupkg`-bestand; zodra het pakket op NuGet.org staat, kunt u het ook rechtstreeks installeren:
+## Installatie
+
+> [!IMPORTANT]
+> **Gebruik altijd de [nieuwste release](https://github.com/domainreseller/dotnet-dna/releases/latest).** Release-pakketten hebben een versienummer en zijn getest.
+> De groene knop **Code → Download ZIP** downloadt in plaats daarvan de ontwikkelbranch.
 
 ```bash
 dotnet add package DomainNameApi
 ```
 
-Om een gedownload `.nupkg`-bestand te installeren, plaatst u het in een map en gebruikt u die map als pakketbron:
+Om een gedownload `.nupkg` te installeren, zet je het in een map en gebruik je die map als pakketbron:
 
 ```bash
 dotnet add package DomainNameApi --source ./packages
 ```
 
-**B) Projectverwijzing** — download de broncode van de release en verwijs naar het project:
+Of verwijs naar het project uit de broncode van een release:
 
 ```bash
 dotnet add reference path/to/dotnet-dna/src/DomainNameApi/DomainNameApi.csproj
 ```
 
-## 🔑 API-gegevens — Reseller ID & API-sleutel
+**Vereisten:** .NET 10 of nieuwer, of een runtime die .NET Standard 2.0 ondersteunt. Er zijn geen dependencies van
+derden. Op .NET Standard 2.0 haalt het package `System.Text.Json` en `Microsoft.Bcl.AsyncInterfaces` van Microsoft
+binnen, die in .NET ingebouwd zijn.
 
-De bibliotheek communiceert met de REST-API van DomainNameAPI en heeft precies twee inloggegevens nodig, die aan de constructor worden meegegeven:
+<a id="credentials"></a>
 
-| Parameter | Waarde |
-|---|---|
-| Eerste | Reseller ID — UUID zoals `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
-| Tweede | API-sleutel |
+## Inloggegevens
 
-> 💡 Uw **Reseller ID** en **API-sleutel** vindt u in uw DomainNameAPI-paneel onder **API-instellingen**.
-> ⚠️ Dit zijn **API-gegevens** — uw inloggegevens voor het paneel werken hier **niet**.
+De API authenticeert elk request met twee waarden, die de SDK voor je meestuurt:
 
-```csharp
-using DomainNameApi;
-
-var resellerId = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-var apiKey     = "your-api-key";
-
-// Live environment
-var dna = new DomainNameApiClient(resellerId, apiKey);
-
-// Test (OTE) environment
-var dna = new DomainNameApiClient(resellerId, apiKey, true);
-```
-
-Spaties aan het begin en einde van beide gegevens worden verwijderd. De testmodusvlag kan ook als tekst worden meegegeven, zoals configuratiebestanden en panelen die opslaan: `"true"`, `"1"`, `"on"` en `"yes"` (hoofdletterongevoelig) kiezen de testomgeving, elke andere waarde kiest de live-omgeving.
-
-```csharp
-var dna = new DomainNameApiClient(resellerId, apiKey, Environment.GetEnvironmentVariable("DNA_TEST_MODE"));
-```
-
-## 🚀 Snel aan de slag
-
-```csharp
-using System;
-using DomainNameApi;
-
-using var dna = new DomainNameApiClient("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "your-api-key");
-
-var result = dna.GetDetails("example.com");
-
-if ((string)result["result"] == "OK")
-{
-    Console.WriteLine("Status:  " + (string)result["data"]["Status"]);
-    Console.WriteLine("Expires: " + (string)result["data"]["Dates"]["Expiration"]);
-}
-else
-{
-    Console.WriteLine("Error " + (string)result["error"]["Code"] + ": " + (string)result["error"]["Message"]);
-}
-```
-
-### Retourwaarden
-
-Elke methode geeft dezelfde structuur terug als php-dna, in de vorm van een `System.Text.Json.Nodes.JsonNode` (meestal een `JsonObject`). Lees waarden uit met casts of `GetValue<T>()`, of print het volledige resultaat met `ToJsonString()`:
-
-```csharp
-var details = dna.GetDetails("example.com");
-string status = (string)details["data"]["Status"];          // "Active"
-int    days   = (int)details["data"]["Dates"]["RemainingDays"];
-bool   locked = (string)details["data"]["LockStatus"] == "true";   // flags are the strings "true"/"false"
-Console.WriteLine(details.ToJsonString());
-```
-
-Sleutelnamen, stringvlaggen (`"true"`/`"false"`) en geformatteerde geldbedragen als strings (`"11.9900"`) zijn exact gelijk aan php-dna. De meeste methoden gebruiken de envelop `result` = `OK`/`ERROR`; `GetCurrentBalance` gebruikt de oudere `OperationResult`-envelop en `CheckAvailability` geeft bij succes een kale lijst terug.
-
-Invoer zoals contacten, TR-attributen en lijstfilters zijn `IDictionary<string, object>` met de sleutels van php-dna (`FirstName`, `EMail`, `AddressLine1`, `PhoneCountryCode`, `TRABISCITIZENID`, `PageSize`, ...). Nameserverlijsten kunnen een lijst (`string[]`, `List<string>`) of een dictionary (de waarden worden gebruikt) zijn.
-
-### Gebruik
-
-Alle onderstaande voorbeelden kunnen ook vanuit de map [examples](examples) worden uitgevoerd (zie [Voorbeelden](#voorbeelden)).
-
-#### Domeinregistratie
-
-Let op: voor .tr-domeinen zijn extra parameters vereist. De parameter `additionalAttributes` wordt gebruikt voor domeinnamen die extra informatie vereisen, zoals .tr.
-
-```csharp
-var contact = new Dictionary<string, object>
-{
-    ["FirstName"]        = "John",
-    ["LastName"]         = "Doe",
-    ["Company"]          = "Example Corp",
-    ["EMail"]            = "john.doe@example.com",
-    ["AddressLine1"]     = "123 Lorem Street",
-    ["AddressLine2"]     = "Suite 456",
-    ["AddressLine3"]     = "",
-    ["City"]             = "Springfield",
-    ["Country"]          = "US",
-    ["Fax"]              = "1234567890",
-    ["FaxCountryCode"]   = "1",
-    ["Phone"]            = "9876543210",
-    ["PhoneCountryCode"] = 1,
-    ["Type"]             = "Contact",
-    ["ZipCode"]          = "12345",
-    ["State"]            = "IL",
-};
-
-var result = dna.RegisterWithContactInfo(
-    "example.com",
-    1,
-    new Dictionary<string, object>
-    {
-        ["Administrative"] = contact,
-        ["Billing"]        = contact,
-        ["Technical"]      = contact,
-        ["Registrant"]     = contact,
-    },
-    new[] { "ns1.example.com", "ns2.example.com" },
-    eppLock: true,
-    privacyLock: false,
-    // Additional attributes are only required for .tr domains
-    additionalAttributes: new Dictionary<string, object>
-    {
-        ["TRABISDOMAINCATEGORY"] = 1,
-        ["TRABISCITIZIENID"]     = "12345678901",
-        ["TRABISNAMESURNAME"]    = "John Doe",
-        ["TRABISCOUNTRYID"]      = "840",
-        ["TRABISCITYID"]         = "17",
-    });
-```
-
-Contacten worden aangevuld voordat ze worden verzonden: ontbrekende velden krijgen plaatsaanduidingswaarden, cijfers en leestekens worden uit namen verwijderd, een ontbrekende of lege provincie/staat wordt vervangen door de plaats, landnamen worden omgezet naar ISO-codes en telefoonnummers worden opgesplitst in nummer en landcode — een nummer dat met een eigen landcode via `+` of `00` is geschreven, behoudt die code (zie `ValidateContact`). Wanneer er geen nameserver (of alleen lege) wordt opgegeven, worden `ns1.domainnameapi.com` en `ns2.domainnameapi.com` gebruikt. Voor .tr-domeinen worden de TRABIS-attributen teruggebracht tot wat de gateway accepteert (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`); de verouderde sleutel `TRABISCITIZIENID` en de numerieke categorie worden automatisch omgezet.
-
-<details>
-<summary>Voorbeelduitvoer voor domeinregistratie</summary>
-
-```json
-{
-  "data": {
-    "ID": 123456,
-    "Status": "Active",
-    "DomainName": "example.com",
-    "AuthCode": "Xy9#mK2$pL5@vN8",
-    "LockStatus": "true",
-    "PrivacyProtectionStatus": "false",
-    "IsChildNameServer": "false",
-    "Contacts": {
-      "Billing": { "ID": 987654 },
-      "Technical": { "ID": 987654 },
-      "Administrative": { "ID": 987654 },
-      "Registrant": { "ID": 987654 }
-    },
-    "Dates": { "Start": "2024-03-15T10:00:00", "Expiration": "2025-03-15T10:00:00", "RemainingDays": 365 },
-    "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-    "Additional": [],
-    "ChildNameServers": []
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-Als de gateway de bestelling weigert (hij antwoordt met `"success": false`), geeft de methode een foutenvelop terug met `Code` = `REGISTER_DOMAIN` en de melding van de gateway, zodat een geweigerde registratie nooit als voltooid wordt gemeld. `Renew` (`RENEW_DOMAIN`) en `Transfer` (`TRANSFER_DOMAIN`) gedragen zich op dezelfde manier.
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domeinverlenging
-
-```csharp
-var result = dna.Renew("example.com", 1);
-```
-
-<details>
-<summary>Voorbeelduitvoer voor domeinverlenging</summary>
-
-```json
-{ "result": "OK", "data": { "ExpirationDate": "2025-03-15T10:00:00" } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domeintransfer
-
-```csharp
-var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
-```
-
-> ℹ️ Een transfer verstuurt nooit contacten: het verzoek bevat altijd een lege contactenlijst en de registrar neemt de contacten zelf over. `Transfer` heeft daarom geen contactparameter; werk de contacten indien nodig na afloop van de transfer bij met `SaveContacts`.
-
-<details>
-<summary>Voorbeelduitvoer voor domeintransfer</summary>
-
-```json
-{
-  "data": {
-    "ID": 0, "Status": "Active", "DomainName": "", "AuthCode": "",
-    "LockStatus": "false", "PrivacyProtectionStatus": "false", "IsChildNameServer": "false",
-    "Contacts": { "Billing": { "ID": 0 }, "Technical": { "ID": 0 }, "Administrative": { "ID": 0 }, "Registrant": { "ID": 0 } },
-    "Dates": { "Start": "", "Expiration": "2027-11-09T12:00:00", "RemainingDays": 365 },
-    "NameServers": [], "Additional": [], "ChildNameServers": []
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Een transfer annuleren, goedkeuren of weigeren
-
-```csharp
-dna.CancelTransfer("example.com");   // pending incoming transfer
-dna.ApproveTransfer("example.com");  // pending outgoing transfer
-dna.RejectTransfer("example.com");   // pending outgoing transfer
-```
-
-<details>
-<summary>Voorbeelduitvoer voor het annuleren van een transfer</summary>
-
-```json
-{ "result": "OK", "data": { "DomainName": "example.com", "Status": "Cancelled" } }
-```
-
-`ApproveTransfer` en `RejectTransfer` antwoorden op dezelfde manier met `Approved` / `Rejected`.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Transfercontrole
-
-```csharp
-var result = dna.CheckTransfer("example.com", "Ab1!xyZ9");
-```
-
-`result` is alleen `OK` wanneer het register het domein als overdraagbaar meldt; anders is het `ERROR` met `Code` = `TRANSFER_NOT_AVAILABLE` en staan de details nog steeds onder `data`.
-
-<details>
-<summary>Voorbeelduitvoer voor transfercontrole</summary>
-
-```json
-{
-  "result": "OK",
-  "data": {
-    "TransferAvailabilityStatus": true,
-    "AuthCodeIsRequired": true,
-    "AuthCodeIsValid": true,
-    "UserTransferRequired": false,
-    "TransferLock": false,
-    "Message": "Domain can be transferred",
-    "MessageKey": "TransferAvailable",
-    "Additional": []
-  }
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domeinlijst
-
-```csharp
-var result = dna.GetList(new Dictionary<string, object>
-{
-    ["OrderColumn"]    = "Id",
-    ["OrderDirection"] = "ASC",
-    ["PageNumber"]     = 0,
-    ["PageSize"]       = 1000,
-});
-```
-
-`PageNumber` begint bij nul. De eigen filternamen van de gateway (`MaxResultCount`, `SkipCount`, `Sorting`, `DomainName`, ...) kunnen ook worden meegegeven.
-
-<details>
-<summary>Voorbeelduitvoer voor domeinlijst</summary>
-
-```json
-{
-  "data": {
-    "Domains": [
-      {
-        "ID": 564346,
-        "Status": "Active",
-        "DomainName": "example.com",
-        "AuthCode": "",
-        "LockStatus": "false",
-        "PrivacyProtectionStatus": "false",
-        "IsChildNameServer": "false",
-        "Contacts": { "Billing": { "ID": "" }, "Technical": { "ID": "" }, "Administrative": { "ID": "" }, "Registrant": { "ID": "" } },
-        "Dates": { "Start": "2024-03-15T10:00:00", "Expiration": "2025-03-15T10:00:00", "RemainingDays": 365 },
-        "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-        "Additional": [],
-        "ChildNameServers": []
-      }
-    ]
-  },
-  "result": "OK",
-  "TotalCount": 1
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### TLD-lijst
-
-```csharp
-var result = dna.GetTldList(100);
-```
-
-<details>
-<summary>Voorbeelduitvoer voor TLD-lijst</summary>
-
-```json
-{
-  "data": [
-    {
-      "id": 1,
-      "status": "Active",
-      "maxchar": 63,
-      "maxperiod": 10,
-      "minchar": 1,
-      "minperiod": 1,
-      "tld": "com",
-      "pricing": {
-        "registration": { "1": "10.8100" },
-        "renew": { "1": "11.0100" },
-        "transfer": { "1": "10.6100" },
-        "restore": { "1": "99.9000" }
-      },
-      "currencies": { "registration": "USD", "renew": "USD", "transfer": "USD", "restore": "USD" }
-    }
-  ],
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Beschikbaarheidscontrole van domeinen
-
-```csharp
-var result = dna.CheckAvailability(new[] { "hello", "world123x0" }, new[] { "com", "net" }, 1, "create");
-```
-
-<details>
-<summary>Voorbeelduitvoer voor beschikbaarheidscontrole van domeinen</summary>
-
-```json
-[
-  {
-    "TLD": "com", "DomainName": "hello", "Status": "notavailable", "Command": "create", "Period": 1,
-    "IsFee": false, "Price": "10.8100", "Currency": "USD", "Reason": "Domain exists"
-  },
-  {
-    "TLD": "com", "DomainName": "world123x0", "Status": "available", "Command": "create", "Period": 1,
-    "IsFee": false, "Price": "10.8100", "Currency": "USD", "Reason": null
-  }
-]
-```
-
-Bij een fout geeft de methode in plaats van een lijst de gebruikelijke foutenvelop terug; controleer dus eerst `result is JsonArray`.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domeindetails
-
-```csharp
-var result = dna.GetDetails("example.com");
-var synced = dna.SyncFromRegistry("example.com"); // same envelope
-```
-
-<details>
-<summary>Voorbeelduitvoer voor domeindetails</summary>
-
-```json
-{
-  "data": {
-    "ID": 564346,
-    "Status": "Active",
-    "DomainName": "example.com",
-    "AuthCode": "DHQ!K52",
-    "LockStatus": "true",
-    "PrivacyProtectionStatus": "false",
-    "IsChildNameServer": "true",
-    "Contacts": {
-      "Billing": { "ID": "DNA-B-4" },
-      "Technical": { "ID": "DNA-T-3" },
-      "Administrative": { "ID": "DNA-A-2" },
-      "Registrant": { "ID": "DNA-R-1" }
-    },
-    "Dates": { "Start": "2025-05-26T16:08:37", "Expiration": "2027-05-26T16:08:37", "RemainingDays": 449 },
-    "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-    "Additional": [],
-    "ChildNameServers": [ { "ns": "ns1.example.com", "ip": "1.2.3.4" } ]
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Nameservers wijzigen
-
-```csharp
-var result = dna.ModifyNameServer("example.com", new[] { "ns1.example.com", "ns2.example.com" });
-```
-
-Hostnamen worden ontdaan van spaties, naar kleine letters omgezet en van een afsluitende punt ontdaan; lege en dubbele items worden weggelaten.
-
-<details>
-<summary>Voorbeelduitvoer voor het wijzigen van nameservers</summary>
-
-```json
-{ "result": "OK", "data": { "NameServers": [ "ns1.example.com", "ns2.example.com" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domeinvergrendeling inschakelen
-
-```csharp
-var result = dna.EnableTheftProtectionLock("example.com");
-```
-
-<details>
-<summary>Voorbeelduitvoer voor het inschakelen van domeinvergrendeling</summary>
-
-```json
-{ "result": "OK", "data": { "LockStatus": true } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domeinvergrendeling uitschakelen
-
-```csharp
-var result = dna.DisableTheftProtectionLock("example.com");
-```
-
-<details>
-<summary>Voorbeelduitvoer voor het uitschakelen van domeinvergrendeling</summary>
-
-```json
-{ "result": "OK", "data": { "LockStatus": false } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Child nameserver toevoegen
-
-```csharp
-var result = dna.AddChildNameServer("example.com", "ns1.example.com", "1.2.3.4");
-```
-
-<details>
-<summary>Voorbeelduitvoer voor het toevoegen van een child nameserver</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com", "IPAdresses": [ "1.2.3.4" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Child nameserver verwijderen
-
-```csharp
-var result = dna.DeleteChildNameServer("example.com", "ns1.example.com");
-```
-
-<details>
-<summary>Voorbeelduitvoer voor het verwijderen van een child nameserver</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com" } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Child nameserver bijwerken
-
-```csharp
-var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.4");
-```
-
-<details>
-<summary>Voorbeelduitvoer voor het bijwerken van een child nameserver</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com", "IPAdresses": [ "1.2.3.4" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domeinprivacy wijzigen
-
-```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
-
-// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
-var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
-```
-
-Het optionele derde argument (`reason`) bestaat alleen voor compatibiliteit; de gateway kent zo'n veld niet en het wordt niet verzonden.
-
-<details>
-<summary>Voorbeelduitvoer voor het wijzigen van domeinprivacy</summary>
-
-```json
-{ "data": { "PrivacyProtectionStatus": true }, "result": "OK" }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domeincontacten ophalen
-
-```csharp
-var result = dna.GetContacts("example.com");
-```
-
-<details>
-<summary>Voorbeelduitvoer voor het ophalen van domeincontacten</summary>
-
-```json
-{
-  "data": {
-    "contacts": {
-      "Administrative": {
-        "ID": "DNA-A-2",
-        "Status": "Active",
-        "AuthCode": "",
-        "FirstName": "Grace",
-        "LastName": "Hopper",
-        "Company": "",
-        "EMail": "grace@example.com",
-        "Type": "Administrative",
-        "Address": {
-          "Line1": "Example Street 2", "Line2": "", "Line3": "",
-          "State": "DC", "City": "Washington", "Country": "US", "ZipCode": "20001"
-        },
-        "Phone": {
-          "Phone": { "Number": "2025550100", "CountryCode": "1" },
-          "Fax": { "Number": "2025550101", "CountryCode": "1" }
-        },
-        "Additional": []
-      },
-      "Billing": { "...": "..." },
-      "Registrant": { "...": "..." },
-      "Technical": { "...": "..." }
-    }
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domeincontacten opslaan
-
-```csharp
-var contact = new Dictionary<string, object>
-{
-    ["FirstName"]        = "John",
-    ["LastName"]         = "Doe",
-    ["Company"]          = "Example Corp",
-    ["EMail"]            = "john@example.com",
-    ["AddressLine1"]     = "123 Main Street",
-    ["AddressLine2"]     = "",
-    ["AddressLine3"]     = "",
-    ["City"]             = "Springfield",
-    ["Country"]          = "US",
-    ["Fax"]              = "5559876543",
-    ["FaxCountryCode"]   = "1",
-    ["Phone"]            = "5551234567",
-    ["PhoneCountryCode"] = 1,
-    ["Type"]             = "Contact",
-    ["ZipCode"]          = "62701",
-    ["State"]            = "IL",
-};
-
-var result = dna.SaveContacts("example.com", new Dictionary<string, object>
-{
-    ["Administrative"] = contact,
-    ["Billing"]        = contact,
-    ["Technical"]      = contact,
-    ["Registrant"]     = contact,
-});
-```
-
-Contacten kunnen ook in de geneste vorm worden meegegeven (`Address` → `Line1`/`City`/..., `Phone` → `Phone`/`Fax` → `Number`/`CountryCode`), de vorm die `GetContacts` teruggeeft.
-
-<details>
-<summary>Voorbeelduitvoer voor het opslaan van domeincontacten</summary>
-
-```json
-{ "result": "OK", "data": { "contacts": [] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Resellerdetails ophalen
-
-```csharp
-var result = dna.GetResellerDetails();
-```
-
-<details>
-<summary>Voorbeelduitvoer voor het ophalen van resellerdetails</summary>
-
-```json
-{
-  "result": "OK",
-  "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "active": true,
-  "name": "Example Reseller",
-  "balance": "500.00",
-  "currency": "USD",
-  "symbol": "$",
-  "balances": [
-    { "balance": "500.00", "currency": "USD", "symbol": "$" },
-    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
-  ]
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Huidig saldo
-
-```csharp
-var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
-```
-
-<details>
-<summary>Voorbeelduitvoer voor huidig saldo</summary>
-
-```json
-{
-  "ErrorCode": 0,
-  "OperationMessage": "Command completed succesfully.",
-  "OperationResult": "SUCCESS",
-  "Balance": "601.64",
-  "CurrencyId": 2,
-  "CurrencyInfo": null,
-  "CurrencyName": "USD",
-  "CurrencySymbol": "$"
-}
-```
-
-Bij een fout is `OperationResult` gelijk aan `FAILED`, bevat `ErrorCode` de foutcode (bijvoorbeeld `API_429`) en is `Balance` gelijk aan `"0.00"`. Het account meldt alleen saldi in USD en TRY; een opvraag in een andere valuta (EUR, GBP, ...) mislukt met `ErrorCode` = `BALANCE` en de melding `No EUR balance is reported for this account. Available: USD, TRY.`
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### DNS-zonebeheer
-
-De gateway slaat een zone op als record-**sets** (naam + type → waarden) en vervangt bij elke schrijfactie een volledige set. De methoden `*ResourceRecordSet` en `*ResourceRecordValue` regelen dat voor u. Namen kunnen relatief zijn (`www`), de apex (`@`, `""` of `example.com`) of volledig gekwalificeerd (`www.example.com.`). Ondersteunde typen: `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. Schrijfacties worden direct doorgevoerd, tenzij u `apply: false` meegeeft en zelf `ApplyResourceRecords` aanroept; als dat automatisch doorvoeren mislukt, geeft de methode de fout van het doorvoeren terug (de wijziging blijft klaargezet en is niet live). Opeenvolgende zone-aanroepen worden minstens één seconde uit elkaar gehouden, omdat de gateway op snelle reeksen aanroepen antwoordt met HTTP 429.
-
-```csharp
-// List every record (one row per value; names are fully qualified)
-var records = dna.GetResourceRecords("example.com");
-
-// Make a set hold exactly these values
-dna.SetResourceRecordSet("example.com", "@", "MX", new[] { "10 mx1.example.com", "20 mx2.example.com" }, 3600);
-
-// Add / remove / replace one value, keeping the others
-dna.AddResourceRecordValue("example.com", "@", "MX", "30 mx3.example.com");
-dna.RemoveResourceRecordValue("example.com", "@", "MX", "20 mx2.example.com.");
-dna.ReplaceResourceRecordValue("example.com", "@", "A", "192.0.2.1", "192.0.2.2");
-
-// Remove a whole set
-dna.DeleteResourceRecordSet("example.com", "old", "A");
-
-// Low-level calls (one write = one set)
-dna.AddResourceRecord("example.com", "www", "A", "192.0.2.5", 300);
-dna.EditResourceRecord("example.com", "www", "www", "A", "192.0.2.6", 600);
-dna.DeleteResourceRecord("example.com", "www", "192.0.2.6", "A");
-
-// Stage several changes, then commit once
-dna.AddResourceRecord("example.com", "api", "A", "192.0.2.7", 300, apply: false);
-dna.AddResourceRecord("example.com", "cdn", "CNAME", "cdn.example.net.", 300, apply: false);
-dna.ApplyResourceRecords("example.com");
-```
-
-<details>
-<summary>Voorbeelduitvoer voor DNS-zonebeheer</summary>
-
-`GetResourceRecords`:
-
-```json
-{
-  "result": "OK",
-  "data": {
-    "records": [
-      { "Name": "example.com.", "Type": "A", "TTL": 3600, "Content": "192.0.2.1", "Disabled": false },
-      { "Name": "www.example.com.", "Type": "CNAME", "TTL": 300, "Content": "example.com.", "Disabled": false },
-      { "Name": "example.com.", "Type": "MX", "TTL": 3600, "Content": "10 mx1.example.com.", "Disabled": false }
-    ]
-  }
-}
-```
-
-`SetResourceRecordSet` / `AddResourceRecordValue` (het type wordt in hoofdletters gemeld en de TTL zoals verzonden, begrensd tot 1–86400 seconden):
-
-```json
-{ "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
-```
-
-Het toevoegen van een waarde die al aanwezig is, of het verwijderen van een waarde die ontbreekt, verandert niets en geeft `{"result":"OK","data":{..., "Changed": false}}` terug. Een niet-ondersteund type wordt geweigerd voordat er een aanroep wordt gedaan:
-
-```json
-{ "result": "ERROR", "error": { "Code": "ADD_ZONE", "Message": "Record type \"NS\" is not supported by the DNS zone API. Supported types: A, AAAA, ALIAS, CAA, CNAME, DS, MX, NAPTR, PTR, SRV, TLSA, TXT.", "Details": "..." } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### URL-doorsturing
-
-```csharp
-dna.SetForwarding("example.com", "https://www.example.org", "Standard"); // or "Frame" (masked)
-var forwarding = dna.GetForwarding("example.com");
-dna.DeleteForwarding("example.com");
-```
-
-<details>
-<summary>Voorbeelduitvoer voor URL-doorsturing</summary>
-
-```json
-{ "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
-```
-
-Als er geen doorsturing is ingesteld (de gateway antwoordt met `Redirect information not found`), geeft `GetForwarding` het volgende terug: `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`. Elke andere fout — bijvoorbeeld een domein dat niet bestaat — wordt als fout teruggegeven.
-
-`DeleteForwarding` geeft `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}` terug; als er niets was ingesteld, doet de aanroep niets en antwoordt hij met `"Removed": false`.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Hulpfuncties (zonder netwerk)
-
-```csharp
-bool isTr = dna.IsTrTLD("example.com.tr"); // true
-
-var contact = dna.ValidateContact(new Dictionary<string, object>
-{
-    ["FirstName"] = " Jo ",
-    ["Phone"]     = "+1 (202) 555-0100",
-    ["Country"]   = "Turkey",
-});
-```
-
-<details>
-<summary>Voorbeelduitvoer voor ValidateContact</summary>
-
-```json
-{
-  "FirstName": "Jo", "Phone": "12025550100", "Country": "TR", "LastName": "Isimyok",
-  "AddressLine1": "Addres yok", "City": "ISTANBUL", "State": "ISTANBUL", "ZipCode": "34000",
-  "PhoneCountryCode": "90", "Fax": "", "FaxCountryCode": ""
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-### Foutafhandeling
-
-Bij API- of netwerkproblemen gooien de methoden nooit een exceptie; in plaats daarvan geven ze een foutenvelop terug:
-
-```json
-{
-  "result": "ERROR",
-  "error": {
-    "Code": "API_404",
-    "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again.",
-    "GatewayCode": "Dna.DomainService:Domain:10007"
-  }
-}
-```
-
-| Situatie | `Code` | `Message` |
+| Waarde | Header | Waar je het vindt |
 |---|---|---|
-| HTTP-fout van de gateway | `API_<status>`, bijv. `API_400`, `API_429`, `API_500` | de melding van de gateway; bij een lege body `HTTP 429 - Too Many Requests` |
-| Onjuiste inloggegevens (HTTP 301/302) | `API_302` | `Invalid API credentials` |
-| Validatiefouten | `API_400` | de melding van de gateway; `Details` somt de velden op, bijv. `Admin PostalCode - 'PostalCode' is required` |
-| Time-out | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| Overige netwerkfouten (DNS, verbinden, TLS, verbroken verbinding) | `CURL_6`, `CURL_7`, `CURL_60`, `CURL_56` | `Curl error during request: ...` |
-| Registratie, verlenging of transfer geweigerd (`"success": false`) | `REGISTER_DOMAIN`, `RENEW_DOMAIN`, `TRANSFER_DOMAIN` | de melding van de gateway |
-| Leeg of onbruikbaar succesantwoord | `RESPONSE` | `Invalid response received from server! Response is empty.` |
-| Controles vóór de aanroep van de gateway | bijv. `AVAILABILITY`, `ADD_ZONE`, `SET_FORWARD` | een beschrijving van het probleem |
+| Reseller ID (een UUID) | `__reseller` | Resellerpaneel → **API settings** |
+| API-sleutel | `X-API-KEY` | Resellerpaneel → **API settings** |
 
-`API_<n>`-codes staan altijd voor een HTTP-status. Als de gateway een eigen foutcode heeft meegestuurd, bevat de envelop die ook als `GatewayCode` (bijvoorbeeld `Dna.DomainService:Domain:10007`), zodat u "domein niet gevonden" kunt onderscheiden van "TLD niet ondersteund" zonder de melding te ontleden. Netwerkfouten gebruiken `CURL_<n>`, waarbij het nummer de nummering van libcurl volgt, zodat de codes overeenkomen met php-dna. Alleen programmeerfouten (bijvoorbeeld het meegeven van een niet-ondersteund objecttype) kunnen een exceptie veroorzaken.
+> [!NOTE]
+> Dit zijn **API-inloggegevens**: je paneelaccount werkt hier niet. **Productie en OTE (de testomgeving) gebruiken
+> verschillende API-sleutels.** Als je de ene bij de andere gebruikt, krijg je `INVALID_API_KEY` of `INVALID_RESELLER`.
 
-Voor het oplossen van problemen kan de laatste aanroep worden bekeken:
+<a id="quick-start"></a>
+
+## Snel aan de slag
 
 ```csharp
-dna.GetLastFunction();       // "request:GET domains/info"
-dna.GetRequestData();        // { "url": ..., "method": ..., "payload": ... }
-dna.GetResponseData();       // decoded response, or { "raw_response": "..." }
-dna.GetResponseHeaders();    // { "url", "http_code", "content_type", "total_time", "headers" }
-dna.GetParsedResponseData(); // parsed response or the error built from it
+using DomainNameApi;
+using DomainNameApi.Contacts;
+using DomainNameApi.Domains;
+
+// OTE is the test environment: real API, its own data, no real money.
+using var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Ote);
+
+// 1. Check the credentials and the balance.
+var account = await client.Account.GetAsync();
+Console.WriteLine($"{account.ResellerName}: {account.UsdBalance} USD");
+
+// 2. Is the domain available, and at what price?
+var search = await client.Domains.SearchAsync("my-new-domain.com");
+Console.WriteLine($"{search.Info?.Status} {search.Info?.Price} {search.Info?.Currency}");
+
+// 3. Register it with one contact for all four roles. This charges the balance.
+var contact = new ContactInfo
+{
+    FirstName = "Ada", LastName = "Lovelace", Email = "ada@example.com",
+    Address = "1 Example Street", City = "Istanbul", State = "Istanbul", PostalCode = "34000",
+    Country = "TR", PhoneCountryCode = "90", Phone = "5551234567",
+};
+var result = await client.Domains.RegisterAsync("my-new-domain.com", contact, ["tr.apiname.com", "eu.apiname.com"]);
+Console.WriteLine($"{result.Status}, expires {result.ExpirationDate:d}");
+
+// 4. List every domain, page by page.
+await foreach (var domain in client.Domains.ListAllAsync())
+{
+    Console.WriteLine($"{domain.DomainName} expires in {domain.RemainingDays} days");
+}
 ```
 
-### Testmodus
+Het [voorbeeldproject](examples/DomainNameApi.Examples) draait scenario's zoals deze tegen OTE:
 
-Geef `true` mee als derde constructorargument om de OTE-testomgeving (`https://ote.domainresellerapi.com/api/v1`) te gebruiken in plaats van de live-omgeving (`https://api.domainresellerapi.com/api/v1`). `GetServiceUrl()` toont het gebruikte adres en `SetServiceUrl(url)` overschrijft het.
+```bash
+dotnet run --project examples/DomainNameApi.Examples -- search example.com
+```
 
-### Foutrapportage (telemetrie)
+<a id="configuration"></a>
 
-Wanneer een API-aanroep mislukt, kan de bibliotheek een foutrapport sturen naar de eigen fouttracker van DomainNameAPI (Sentry). Een klein, willekeurig gekozen deel van de geslaagde aanroepen (4%, plus elke aanroep die langer dan 1 seconde duurt) kan als prestatierecord worden verzonden. Dit helpt DomainNameAPI problemen op te sporen en op te lossen. Foutrapportage staat **standaard aan**.
+## Configuratie
 
-**Wat er wordt verzonden:**
-
-- foutcode en -melding
-- pad van het aangeroepen endpoint en de HTTP-methode
-- duur van de aanroep
-- applicatienaam (`DomainNameAPI-DotNet`), bibliotheekversie en .NET-versie
-- reseller ID en domeinnaam
-- het publieke IP-adres van de server (op de achtergrond opgevraagd via `api.ipify.org`)
-- de naam van het besturingssysteemaccount waaronder de applicatie draait
-- het API-verzoek en -antwoord, inclusief de contactgegevens van het domein; alleen inloggegevens worden gemaskeerd — EPP-/auth-codes, API-sleutels, wachtwoorden en tokens worden vervangen door `***`
-
-**Wat nooit wordt verzonden:** EPP-/auth-codes, API-sleutels, wachtwoorden of tokens in leesbare vorm; methodeargumenten in stacktraces.
-
-**Waarom en hoe lang:** de gegevens worden uitsluitend gebruikt voor gebruiksmeting en het vroegtijdig opsporen van problemen, en worden 30 dagen bewaard op de eigen Sentry-server van DomainNameAPI, waarna ze automatisch worden verwijderd.
-
-Rapporten worden op de achtergrond verzonden: ze blokkeren of vertragen uw aanroep nooit en veroorzaken nooit een exceptie. Verwachte fouten die vaak voorkomen (domein niet gevonden, onvoldoende saldo, ongeldige inloggegevens, geen doorsturing ingesteld, ...) worden niet gerapporteerd.
-
-**Zo schakelt u het uit:** roep na het aanmaken van de client `SetErrorReportingEnabled(false)` aan:
+Er zijn vier manieren om een client te maken:
 
 ```csharp
-var dna = new DomainNameApiClient(resellerId, apiKey);
-dna.SetErrorReportingEnabled(false);
+// Credentials and environment
+var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Production);
+
+// All settings
+var client = new DomainNameApiClient(new DomainNameApiOptions
+{
+    ResellerId = resellerId,
+    ApiKey = apiKey,
+    Environment = ApiEnvironment.Ote,
+    Timeout = TimeSpan.FromSeconds(30),
+    ReadOnly = true,
+});
+
+// The same environment variables the dna CLI reads
+var client = DomainNameApiClient.FromEnvironment();
+
+// On top of your own HttpClient (for example from IHttpClientFactory)
+var client = new DomainNameApiClient(httpClient, options);
 ```
 
-**Minimale modus:** `SetTelemetryMinimal(true)` laat de rapportage aan, maar verzendt alleen de foutcode en -melding, het endpoint, de tijdsduur, de versies en de reseller ID — geen verzoek-/antwoordgegevens, domein, IP-adres of accountnaam.
+| Optie | Standaard | Betekenis |
+|---|---|---|
+| `ResellerId`, `ApiKey` | (verplicht) | De inloggegevens. |
+| `Environment` | `Production` | `Production` (`https://api.domainresellerapi.com`) of `Ote` (`https://ote.domainresellerapi.com`). |
+| `BaseAddress` | geen | Overschrijft het adres van de omgeving, bijvoorbeeld voor een proxy. |
+| `Timeout` | 60 s | Tijdslimiet van één poging. |
+| `MaxRetries` | 2 | Hoe vaak een mislukt request wordt herhaald (zie [retries](#safety-retries-and-rate-limits)). 0 zet retries uit. |
+| `MaxRetryDelay` | 30 s | De langste wachttijd voor een retry. |
+| `PaceRequests` | `true` | Spreidt requests zodat je onder de rate limits van de gateway blijft. |
+| `ReadOnly` | `false` | Blokkeert elk request dat geen leesactie is, voordat het wordt verstuurd. |
+| `UserAgent` | `DomainNameAPI-DotNet/<version>` | De `User-Agent`-header. |
 
-De bestemming kan worden gewijzigd met de eigenschap `TelemetryDsn` (bijvoorbeeld naar uw eigen Sentry-project).
+`FromEnvironment()` leest:
 
-> 🔒 **Beveiliging:** TLS-certificaatverificatie staat aan. Op een host met een verouderde CA-bundel kan deze worden uitgeschakeld met `dna.SetSslVerification(false);` — dit wordt niet aanbevolen; de CA-bundel bijwerken is de betere oplossing.
+| Variabele | Betekenis |
+|---|---|
+| `DNA_RESELLER_ID`, `DNA_API_KEY` | De inloggegevens. |
+| `DNA_ENV` | `production` of `ote` (ook `prod`, `live`, `test`, `sandbox`). |
+| `DNA_TEST_MODE` | `true`, `1`, `on` of `yes` kiest OTE. Wordt gebruikt als `DNA_ENV` niet is ingesteld. |
+| `DNA_BASE_URL` | Optionele overschrijving van het basisadres. |
+| `DNA_READ_ONLY` | `true` zet de read-only modus aan. |
 
-### Geavanceerd
+De client is thread-safe. Maak er één per set inloggegevens en hergebruik hem zolang de applicatie draait.
 
-- **Time-outs:** 30 seconden per verzoek en 10 seconden om verbinding te maken; wijzig ze met de eigenschappen `Timeout` en `ConnectTimeout`.
-- **Eigen transport:** geef een `IHttpTransport` mee aan de constructor (`new DomainNameApiClient(id, key, false, transport)`) of stel de eigenschap `Transport` in om verzoeken via uw eigen HTTP-stack, een proxy of een test double te laten lopen. Implementaties geven elke HTTP-status terug (redirects worden niet gevolgd) en gooien een `TransportException` bij netwerkfouten.
-- **Threads:** een client bewaart het laatste verzoek en antwoord voor diagnose en is niet thread-safe. Gebruik één instantie per thread (of per verzoek) of synchroniseer de toegang. `Dispose()` geeft de onderliggende `HttpClient` vrij.
-- **User-Agent:** verzoeken worden verzonden als `DomainNameAPI-DotNet/1.0.1`.
+<a id="usage"></a>
 
-### Voorbeelden
+## Gebruik
 
-Het project [examples](examples/DomainNameApi.Examples) bevat één uitvoerbaar bestand per methode (`GetDetails`, `RegisterWithContactInfo`, `RegisterWithContactInfo-TR`, de methoden voor DNS-zones en doorsturing, ...). Stel uw inloggegevens in en voer er een uit:
+Elk deel van de API heeft een eigen client. Methoden nemen eenvoudige argumenten; voor meer opties heeft elke methode ook een
+overload (of een zusjermethode) die het requestobject neemt.
 
-```bash
-export DNA_RESELLER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-export DNA_API_KEY=your-api-key
-export DNA_TEST_MODE=true   # optional: use the OTE test environment
+<a id="account"></a>
 
-dotnet run --project examples/DomainNameApi.Examples -- GetDetails
-dotnet run --project examples/DomainNameApi.Examples            # lists all examples
+### Account
+
+```csharp
+var account = await client.Account.GetAsync();             // ResellerId, ResellerName, TryBalance, UsdBalance
+
+// This month's charges, across all pages
+var request = new ListTransactionsRequest
+{
+    ChargeType = ChargeType.Subtract,
+    StartDate = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero),
+    TransactionTypes = { TransactionType.Register, TransactionType.Renew },
+};
+await foreach (var transaction in client.Account.ListAllTransactionsAsync(request))
+{
+    Console.WriteLine($"{transaction.CreationTime:d} {transaction.Type} {transaction.Amount} {transaction.AmountCurrency}");
+}
 ```
 
-### Testen
+<a id="domains"></a>
 
-De tests hebben geen inloggegevens nodig en doen geen externe netwerkaanroepen:
+### Domeinen
+
+**Zoeken**
+
+```csharp
+var one = await client.Domains.SearchAsync("example.com", currency: "USD");
+bool available = one.Info?.IsAvailable == true;
+
+var many = await client.Domains.BulkSearchAsync(["example.com", "example.net", "example.com.tr"]);
+foreach (var domain in many.Available)
+{
+    Console.WriteLine($"{domain.DomainName}: {domain.Price} {domain.Currency}");
+}
+```
+
+**Lijst en details**
+
+```csharp
+var page = await client.Domains.ListAsync(new ListDomainsRequest { MaxResultCount = 50, Statuses = { DomainStatus.Active } });
+
+await foreach (var domain in client.Domains.ListAllAsync(new ListDomainsRequest { DomainName = "example" }))
+{
+    Console.WriteLine($"{domain.DomainName} {domain.Status} {domain.ExpirationDate:d}");
+}
+
+var details = await client.Domains.GetAsync("example.com");
+Console.WriteLine(details.AuthCode);
+Console.WriteLine(details.GetContact(ContactType.Registrant)?.Email);
+```
+
+**Registreren, verlengen, verhuizen, herstellen** (deze belasten je saldo)
+
+```csharp
+// One contact for all four roles
+await client.Domains.RegisterAsync("example.com", contact, ["tr.apiname.com", "eu.apiname.com"], years: 2);
+
+// Full control: different contacts per role, registry attributes, trustee service
+await client.Domains.RegisterAsync(new RegisterDomainRequest("example.com.tr")
+{
+    Period = 1,
+    NameServers = { "tr.apiname.com", "eu.apiname.com" },
+    Contacts = DomainContact.ForAllRoles(contact),
+    TldAttributes = new() { ["<key>"] = "<value>" },   // the keys: (await client.Products.GetTldAsync("com.tr"))!.Attributes
+});
+
+// With existing contact handles
+await client.Domains.RegisterWithHandleAsync("example.com", "DNA-12345", ["tr.apiname.com", "eu.apiname.com"]);
+
+var renewal = await client.Domains.CheckRenewalAsync("example.com");   // free
+if (renewal.IsRenewable)
+{
+    await client.Domains.RenewAsync("example.com", years: 1);
+}
+
+var check = await client.Domains.CheckTransferAsync("example.com", "EPP-CODE");  // free
+if (check.IsTransferable)
+{
+    await client.Domains.TransferAsync("example.com", "EPP-CODE");
+}
+
+await client.Domains.RestoreAsync("example.com");
+```
+
+Requests worden gecontroleerd voordat ze worden verstuurd. Een registratie zonder alle vier de contactrollen, een contact zonder e-mailadres
+of een periode van 0 jaar gooit een `ArgumentException`, en er bereikt niets de API.
+
+**Instellingen**
+
+```csharp
+await client.Domains.LockAsync("example.com");
+await client.Domains.UnlockAsync("example.com");
+await client.Domains.SetPrivacyProtectionAsync("example.com", enabled: true);
+await client.Domains.SetNameServersAsync("example.com", ["ns1.example.net", "ns2.example.net"]);
+await client.Domains.SetNameServersAsync("example.com", ["ns1.example.net"], DnssecMode.DisableDnssec);  // a signed domain
+var authCode = await client.Domains.UpdateAuthCodeAsync("example.com");
+
+await client.Domains.UpdateContactsAsync("example.com", DomainContact.ForAllRoles(contact));
+await client.Domains.SetContactHandlesAsync("example.com", [new ContactHandle(ContactType.Tech, "DNA-12345")]);
+```
+
+**URL-doorsturing, child nameservers en documenten**
+
+```csharp
+await client.Domains.Forwarding.SetAsync("example.com", "https://www.example.net", ForwardType.Standard);
+var forwarding = await client.Domains.Forwarding.GetAsync("example.com");
+await client.Domains.Forwarding.DeleteAsync("example.com");
+
+// The IP version of each address is detected
+await client.Domains.ChildNameServers.AddAsync("example.com", "ns1.example.com", "192.0.2.10", "2001:db8::10");
+await client.Domains.ChildNameServers.UpdateAsync("example.com", "ns1.example.com", ["192.0.2.20"]);
+await client.Domains.ChildNameServers.DeleteAsync("example.com", "ns1.example.com");
+
+// Registry documents (mostly .tr)
+await client.Domains.Documents.UploadAsync("example.com.tr", [DocumentUpload.FromFile(DocumentType.IdentityCard, "id.pdf")]);
+await foreach (var document in client.Domains.Documents.ListAllAsync("example.com.tr"))
+{
+    Console.WriteLine($"{document.Name}: {document.Status}");
+}
+```
+
+<a id="contacts"></a>
+
+### Contacten
+
+Contact handles zijn herbruikbare contacten. Maak er één aan en gebruik hem voor veel domeinen.
+
+```csharp
+var created = await client.Contacts.CreateAsync(contact);
+string handle = created.Handle!;                          // for example DNA-12345
+
+var details = await client.Contacts.GetAsync(handle);     // the contact and its verification state
+var result = await client.Contacts.UpdateAsync(handle, contact);
+Console.WriteLine($"{result.Stats?.SuccessCount} of {result.Stats?.TotalDomainCount} domains updated");
+
+var verifications = await client.Contacts.GetVerificationAsync(handle);
+await client.Contacts.ResendVerificationAsync(handle);
+```
+
+<a id="dns"></a>
+
+### DNS
+
+Zonerecords van domeinen op de nameservers van het platform. Records zijn publiek vindbaar zodra het domein die nameservers gebruikt,
+waar `ApplyAsync` voor zorgt.
+
+```csharp
+var sets = await client.Dns.ListAsync("example.com");
+foreach (var set in sets)
+{
+    Console.WriteLine($"{set.Name} {set.Type} {set.Ttl} {string.Join(", ", set.Values)}");
+}
+
+await client.Dns.AddAsync("example.com", "www", RecordType.A, "192.0.2.10");
+await client.Dns.AddAsync("example.com", "@", "txt", "v=spf1 include:_spf.example.net ~all");   // "txt" becomes TXT
+await client.Dns.AddAsync("example.com", "@", RecordType.MX, ["10 mx1.example.net", "20 mx2.example.net"], ttl: 3600);
+await client.Dns.ReplaceAsync("example.com", "www", RecordType.A, ["192.0.2.20"], ttl: 300);
+await client.Dns.DeleteAsync("example.com", "www", RecordType.A, "192.0.2.20");
+
+var applied = await client.Dns.ApplyAsync("example.com");
+```
+
+De SDK controleert wat de API zou weigeren: een CNAME op de apex, een CAA-waarde zonder de drie onderdelen, een TTL buiten
+1–86400. Zoneaanroepen worden 1 seconde uit elkaar gehouden, de limiet van de gateway.
+
+<a id="dnssec"></a>
+
+### DNSSEC
+
+```csharp
+var info = await client.Dnssec.GetAsync("example.com");   // Status, DsRecords, AllowedAlgorithms, ...
+
+var record = DsRecordData.Parse("12345 13 2 49FD46E6C4B45C55D4AC69CBD3CD34AC1AFE51DE");
+await client.Dnssec.AddAsync("example.com", record);
+await client.Dnssec.RemoveAsync("example.com", record);
+await client.Dnssec.DisableAsync("example.com");          // removes every DS record
+```
+
+<a id="ssl"></a>
+
+### SSL
+
+```csharp
+// 1. Buy (charges the balance). Product codes come from client.Products.ListSslProductsAsync().
+var order = await client.Ssl.PurchaseAsync("example.com", "PKG-CODE");
+
+// 2. A CSR and private key, if you do not have one
+var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com")
+{
+    Country = "TR", State = "Istanbul", Locality = "Istanbul", Organization = "Example Ltd", OrganizationUnit = "IT",
+});
+
+// 3. Configure: CSR, validation method and contact
+var approvers = await client.Ssl.GetApproverEmailsAsync("example.com");
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", csr.Csr!, certificateContact)
+{
+    ValidationMethod = ValidationMethod.Email,
+    ApproverEmail = approvers[0],
+    WebServerType = WebServerType.Apache,
+});
+
+// 4. Wait for issuance, then download
+var status = await client.Ssl.RefreshStatusAsync("example.com");
+if (status.IsIssued)
+{
+    var content = await client.Ssl.GetContentAsync("example.com");
+    File.WriteAllText("fullchain.pem", content.FullChain);
+}
+
+await client.Ssl.ReissueAsync(new ReissueCertificateRequest("example.com") { Csr = newCsr, PrivateKey = newKey });
+await client.Ssl.RevokeAsync("example.com");              // cannot be undone
+```
+
+<a id="hosting"></a>
+
+### Hosting
+
+```csharp
+var packages = await client.Hosting.ListPackagesAsync();
+var created = await client.Hosting.CreateAsync("example.com", "starter-linux");   // charges the balance
+var status = await client.Hosting.GetStatusAsync("example.com");                   // panel access once ready
+var hosting = await client.Hosting.GetAsync("example.com");
+var plans = await client.Hosting.ListPlansAsync();
+```
+
+<a id="orders-and-products"></a>
+
+### Bestellingen en producten
+
+```csharp
+var order = await client.Orders.GetAsync("ORDER-CODE");
+
+var com = await client.Products.GetTldAsync("com");
+Console.WriteLine($"{com?.GetRegistrationPrice(1)?.Price} {com?.GetRegistrationPrice(1)?.Currency}, DNSSEC: {com?.SupportsDnssec}");
+
+await foreach (var tld in client.Products.ListAllTldsAsync(new ListTldsRequest { Currency = "USD" }))
+{
+    Console.WriteLine(tld.Name);
+}
+
+var price = await client.Products.GetPriceAsync("com", OrderType.Renew, years: 1);
+var ssl = await client.Products.ListSslProductsAsync(new ListSslProductsRequest { IsWildcard = true });
+```
+
+<a id="requests-and-baserequest"></a>
+
+## Requests en `BaseRequest`
+
+Elke operatie is een requestklasse, bijvoorbeeld `RenewDomainRequest`, `ListDomainsRequest` of `AddDnsRecordRequest`.
+De clientmethoden hierboven bouwen ze voor je, en je kunt ze ook zelf maken en versturen:
+
+```csharp
+var request = new RenewDomainRequest("example.com", period: 2);
+Console.WriteLine($"{request} is {request.Safety}");   // "POST domains/renew is Billable"
+
+DomainOperationResult result = await client.SendAsync(request);
+
+// The same, with the HTTP details: correlation ID, soft-quota state, attempts, duration
+var response = await client.SendWithResponseAsync(request);
+Console.WriteLine($"{response.CorrelationId} quota {response.Quota?.Used}/{response.Quota?.Limit}");
+```
+
+Alle requests erven van een van drie basisklassen:
+
+| Basisklasse | Voor |
+|---|---|
+| `BaseRequest` | Operaties die niets teruggeven (vergrendelen, ontgrendelen, een DNS-record toevoegen, ...). |
+| `BaseRequest<TResponse>` | Operaties die data teruggeven. |
+| `PagedRequest<TItem>` | Lijstoperaties. Voegt `SkipCount`, `MaxResultCount` en `Sorting` toe en werkt met `ListAllAsync`. |
+
+Een request geeft met een paar overrides aan wat het is. Bij POST en PUT is het requestobject zelf de JSON-body (camelCase,
+null-waarden weggelaten). Queryparameters voeg je toe in `AddQueryParameters`, en controles vóór het versturen horen in `Validate`.
+Om een endpoint aan te roepen dat de SDK nog niet dekt, schrijf je er zelf een:
+
+```csharp
+public sealed class GetDomainNotesRequest : BaseRequest<DomainNotes>
+{
+    public GetDomainNotesRequest(string domainName) => DomainName = domainName;
+
+    public string DomainName { get; }
+
+    public override HttpMethod Method => HttpMethod.Get;
+    public override string Path => "domains/notes";              // below /api/v1/
+    public override OperationSafety Safety => OperationSafety.Read;
+
+    protected override void AddQueryParameters(QueryParameters query) => query.Add("DomainName", DomainName);
+    protected override void Validate() => Require(DomainName, nameof(DomainName));
+}
+
+var notes = await client.SendAsync(new GetDomainNotesRequest("example.com"));
+```
+
+Jouw request krijgt alles wat de ingebouwde requests krijgen: inloggegevens, retries per veiligheidsklasse, pacing, read-only modus en
+foutafhandeling. Overschrijf `GetBody()` als de API een andere bodyvorm verwacht, en `IsIdempotent` als een schrijfactie
+veilig te herhalen is.
+
+<a id="errors"></a>
+
+## Fouten
+
+Elk mislukt request gooit een `DomainNameApiException`. Ongeldige argumenten gooien een `ArgumentException` voordat er iets
+wordt verstuurd.
+
+```csharp
+try
+{
+    await client.Domains.RenewAsync("example.com");
+}
+catch (DomainNameApiException e) when (e.Kind == ApiErrorKind.Validation)
+{
+    Console.WriteLine($"{e.Code}: {e.Message}");          // Dna.DomainService:Domain:10007: ...
+    foreach (var field in e.ValidationErrors)
+    {
+        Console.WriteLine($"  {field}");
+    }
+}
+catch (DomainNameApiException e) when (e.OutcomeUnknown)
+{
+    // A billable or changing request failed on the network: it may have reached the API.
+    // Check the state before sending it again.
+    var details = await client.Domains.GetAsync("example.com");
+}
+```
+
+| Eigenschap | Betekenis |
+|---|---|
+| `Kind` | Een vaste classificatie (tabel hieronder). Vertak op deze waarde, niet op het bericht. |
+| `Code` | De foutcode van de API (zoals `Dna.DomainService:Domain:10007`), of een van de SDK-codes hieronder. |
+| `Message` | Wat er gebeurde. Standaardberichten worden vervangen door de details van de API. |
+| `StatusCode` | De HTTP-status, of null als er geen antwoord kwam. |
+| `Details`, `ValidationErrors` | Extra details en problemen per veld van de API. |
+| `CorrelationId` | De `X-Correlation-Id` van de gateway. Noem hem als je contact opneemt met support. |
+| `Hint` | Een korte suggestie voor wat je daarna kunt doen. |
+| `IsRetryable` | Of het herhalen van hetzelfde request later kan slagen. |
+| `OutcomeUnknown` | Een request dat iets wijzigt, mislukte op het netwerk, dus het kan zijn uitgevoerd. |
+| `Operation`, `Safety` | Het mislukte request (`POST domains/renew`) en zijn veiligheidsklasse. |
+| `RetryAfter`, `ResponseBody` | De `Retry-After` van de gateway en het ruwe antwoord. |
+
+| `Kind` | Wanneer |
+|---|---|
+| `Authentication` | Onjuiste of ontbrekende inloggegevens, of een onbekende of geschorste reseller in deze omgeving (401, redirect). |
+| `Forbidden` | Geauthenticeerd, maar niet toegestaan (403). |
+| `NotFound` | Het domein, contact, de bestelling of een andere resource bestaat niet (404). |
+| `Validation` | De API weigerde de invoer of een bedrijfsregel faalde: ongeldig veld, domein vergrendeld, onvoldoende saldo (400, 422). |
+| `Conflict` | De status van de resource staat de operatie niet toe (409). |
+| `RateLimited` | Na de automatische retries nog steeds rate limited (429). |
+| `Server` | Een fout aan de serverzijde (5xx). Vaak tijdelijk. |
+| `Network`, `Timeout` | Geen antwoord: DNS, TLS, proxy, verbroken verbinding, of geen antwoord binnen `Timeout`. |
+| `ReadOnly` | Geblokkeerd door de read-only modus; er is niets verstuurd. |
+| `Unknown` | Al het overige, inclusief een antwoord dat de SDK niet kon lezen. |
+
+Codes die de SDK zelf instelt:
+
+| Code | Betekenis |
+|---|---|
+| `INVALID_RESELLER` | De gateway verwees door naar de suspendpagina: de reseller-ID is onbekend, inactief of geschorst **in deze omgeving**. |
+| `INVALID_API_KEY` | De sleutel hoort niet bij de reseller. Productie- en OTE-sleutels verschillen. |
+| `MISSING_API_KEY`, `MISSING_RESELLER_ID`, `NO_CREDENTIALS` | Een inloggegeven is leeg. |
+| `SUBRESELLER_NOT_ALLOWED` | Subreseller-accounts kunnen de API niet gebruiken. Gebruik de inloggegevens van de hoofdreseller. |
+| `UNAUTHORIZED` | Elke andere 401. |
+| `RATE_LIMITED` | 429 na de retries. |
+| `NETWORK`, `TIMEOUT` | Er kwam geen antwoord. |
+| `READ_ONLY` | Geblokkeerd door de read-only modus. |
+| `EMPTY_RESPONSE`, `INVALID_RESPONSE` | Een geslaagd antwoord was leeg of kon niet worden gelezen. |
+| `HTTP_<status>` | De API stuurde geen foutcode. |
+
+<a id="safety-retries-and-rate-limits"></a>
+
+## Veiligheid, retries en rate limits
+
+Elk request heeft een veiligheidsklasse, dezelfde als die de `dna` CLI gebruikt:
+
+| `OperationSafety` | Betekent | Voorbeelden |
+|---|---|---|
+| `Read` | Geen neveneffecten, ook niet als de API POST of PUT gebruikt | zoeken, details, lijsten, verlengings- en verhuiscontroles, CSR-generatie |
+| `Write` | Een gratis wijziging die kan worden teruggedraaid | DNS-records, vergrendeling, privacy, nameservers, contacten |
+| `Billable` | Belast je saldo | registreren, verlengen, verhuizen, herstellen, SSL-aankoop, hostingbestelling |
+| `Destructive` | Verwijdert iets of is moeilijk terug te draaien | DNS-record verwijderen, DNSSEC verwijderen, certificaat intrekken |
+
+- **Read-only modus** (`ReadOnly = true` of `DNA_READ_ONLY=true`) blokkeert alles wat geen `Read` is, voordat het wordt verstuurd.
+  Gebruik hem tijdens het verkennen, in rapportages en in dashboards.
+- **Retries.** 429-antwoorden worden altijd herhaald, met inachtneming van `Retry-After`. Dit is veilig, zelfs voor billable requests, omdat
+  de gateway ze weigert voordat er iets wordt uitgevoerd. Netwerkfouten, timeouts en 502/503/504-antwoorden worden alleen herhaald voor
+  leesacties (en voor schrijfacties die veilig te herhalen zijn, zoals het vervangen van nameservers). Een registratie of verlenging wordt nooit twee keer verstuurd.
+- **Pacing.** De gateway staat 5 requests per seconde per sleutel toe, 2 per seconde voor domeinzoekopdrachten en 20 per seconde voor
+  DNS-zoneaanroepen. De client spreidt requests om onder deze limieten te blijven (zoneaanroepen 1 seconde uit elkaar). Domeininfo en de
+  TLD-lijst hebben geen rate limit.
+- **Soft quota.** Zoekopdrachten en infoaanvragen kosten 1 punt, al het andere 10. Boven 200 punten vertraagt de gateway elk
+  request met maximaal 5 seconden; punten nemen met 20% per minuut af. `SendWithResponseAsync` toont de stand in `Quota`.
+
+<a id="dependency-injection"></a>
+
+## Dependency injection
+
+`DomainNameApiClient` werkt als een getypeerde `HttpClient`:
+
+```csharp
+builder.Services.AddSingleton(new DomainNameApiOptions
+{
+    ResellerId = builder.Configuration["DomainNameApi:ResellerId"]!,
+    ApiKey = builder.Configuration["DomainNameApi:ApiKey"]!,
+    Environment = ApiEnvironment.Ote,
+});
+builder.Services.AddHttpClient<DomainNameApiClient>();
+
+// Then inject it
+public sealed class RenewalService(DomainNameApiClient dna)
+{
+    public Task<DomainOperationResult> RenewAsync(string domain) => dna.Domains.RenewAsync(domain);
+}
+```
+
+De SDK volgt op zijn eigen `HttpClient` geen redirects. Een client uit een factory kan ze wel volgen; de SDK herkent de
+suspendpagina van de gateway dan nog steeds en meldt `INVALID_RESELLER`.
+
+<a id="testing-your-code"></a>
+
+## Je code testen
+
+Geef een `HttpClient` met een stub-handler mee om code die de SDK gebruikt te testen zonder de API aan te roepen:
+
+```csharp
+sealed class StubHandler(string json) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+        Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+}
+
+var client = new DomainNameApiClient(
+    new HttpClient(new StubHandler("""{"resellerName":"Test","usdBalance":10}""")),
+    new DomainNameApiOptions { ResellerId = "test", ApiKey = "test", PaceRequests = false });
+
+var account = await client.Account.GetAsync();   // UsdBalance == 10
+```
+
+Gebruik voor tests tegen de echte API OTE met een eigen sleutel.
+
+<a id="project-layout"></a>
+
+## Projectindeling
+
+```
+src/DomainNameApi/
+├── DomainNameApiClient.cs        The entry point: sub-clients, SendAsync, retries, pacing
+├── DomainNameApiOptions.cs       Settings and FromEnvironment()
+├── Core/                         BaseRequest, PagedRequest, QueryParameters, errors, responses, shared enums
+├── Internal/                     JSON settings, error parsing, the rate-limit pacer
+├── Accounts/   AccountClient     Balances and transactions
+├── Contacts/   ContactsClient    Contact handles
+├── Domains/    DomainsClient     Domains, plus Forwarding, ChildNameServers and Documents
+├── Dns/        DnsClient         Zone records
+├── Dnssec/     DnssecClient      DS records
+├── Ssl/        SslClient         Certificates
+├── Hosting/    HostingClient     Hosting packages and services
+├── Orders/     OrdersClient      Orders
+└── Products/   ProductsClient    TLDs, SSL products and prices
+```
+
+Elke gebiedsmap heeft dezelfde opbouw: `XxxClient.cs`, een map `Requests/` met één klasse per operatie en een map `Models/`
+met de antwoorden en enums. Alle typen van een gebied delen één namespace, zoals `DomainNameApi.Domains`.
+
+<a id="development"></a>
+
+## Ontwikkeling
 
 ```bash
+dotnet build
 dotnet test
 ```
 
-Zonder lokale .NET SDK voert u ze uit in Docker:
+De tests roepen nooit de echte API aan: ze gebruiken een nep-`HttpMessageHandler`. Op Windows draaien ze op .NET 10 en op
+.NET Framework 4.8; die laatste test de .NET Standard 2.0-build.
 
-```bash
-docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
-```
+`tests/DomainNameApi.Tests/testdata/openapi.json` is het API-document dat de `dna` CLI insluit. `SpecCoverageTests` controleert
+of elke operatie erin precies één requestklasse heeft met de veiligheidsklasse van de CLI. Als de API een operatie erbij krijgt,
+werk je het document bij en faalt de test totdat het request bestaat.
 
-| Testbestand | Beschrijving |
-|-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | Speelt alle 134 conformiteitsfixtures van php-dna (`testdata/conformance/`) af en vergelijkt verzoeken en resultaten |
-| `tests/DomainNameApi.Tests/HttpLayerTests.cs` | Headers, URL's, querystrings, testmodus, time-outs, tempo van zone-aanroepen |
-| `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | Het standaardtransport op basis van `HttpClient` tegen een lokale listener |
-| `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | Vertaling van gatewayfouten en validatiemeldingen |
-| `tests/DomainNameApi.Tests/TelemetryTests.cs` | Telemetrie-payloads, maskering van inloggegevens, minimale modus |
-| `tests/DomainNameApi.Tests/UtilityTests.cs` | Contactvalidatie, normalisatie van telefoonnummers en landen, PHP-compatibele opmaak |
+<a id="upgrading-from-1x"></a>
 
-<hr style="border: 4px solid #000; border-style: dashed;">
+## Upgraden van 1.x
 
-## Retour- en foutcodes met beschrijvingen
+2.0 is een nieuwe SDK. 1.x was een port van de PHP-bibliotheek en gaf ongetypeerde `JsonNode`-envelopes terug; 2.0 heeft getypeerde requests
+en modellen, async-methoden en uitzonderingen.
 
-| Code | Beschrijving                                   | Detail                                                                                                                                                         |
-|------|------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1000 | Commando succesvol voltooid                    | Bewerking geslaagd.                                                                                                                                            |
-| 1001 | Commando succesvol voltooid; actie in behandeling | Bewerking geslaagd. De bewerking staat momenteel echter in de wachtrij om te worden voltooid.                                                               |
-| 2003 | Vereiste parameter ontbreekt                   | Fout door ontbrekende parameter. Bijvoorbeeld: geen telefoonnummer in de contactgegevens.                                                                      |
-| 2105 | Object komt niet in aanmerking voor verlenging | De domeinstatus staat geen verlenging toe; het domein is vergrendeld voor wijzigingen. De status mag niet "clientupdateprohibited" zijn. Kan ook door andere statusvoorwaarden komen. |
-| 2200 | Authenticatiefout                              | Autorisatiefout: de beveiligingscode is onjuist of het domein is geregistreerd bij een andere registrar.                                                       |
-| 2302 | Object bestaat al                              | Domeinnaam of nameserverinformatie bestaat al in de database. Kan niet worden geregistreerd.                                                                   |
-| 2303 | Object bestaat niet                            | Domeinnaam of nameserverinformatie bestaat niet in de database. Nieuwe registratie vereist.                                                                    |
-| 2304 | Objectstatus verbiedt bewerking                | De domeinstatus staat geen wijzigingen toe; het domein is vergrendeld voor wijzigingen. De status mag niet "clientupdateprohibited" zijn. Kan ook door andere statusvoorwaarden komen. |
+| 1.x | 2.0 |
+|---|---|
+| `new DomainNameApiClient(id, key, testMode: true)` | `new DomainNameApiClient(id, key, ApiEnvironment.Ote)` |
+| `dna.CheckAvailability(...)` | `client.Domains.SearchAsync(...)` / `BulkSearchAsync(...)` |
+| `dna.GetDetails(domain)` | `client.Domains.GetAsync(domain)` |
+| `dna.GetList()` | `client.Domains.ListAsync()` / `ListAllAsync()` |
+| `dna.RegisterWithContactInfo(...)` | `client.Domains.RegisterAsync(...)` |
+| `dna.Renew(domain, period)` | `client.Domains.RenewAsync(domain, years)` |
+| `dna.ModifyNameServer(...)` | `client.Domains.SetNameServersAsync(...)` |
+| `dna.AddChildNameServer(...)` | `client.Domains.ChildNameServers.AddAsync(...)` |
+| `dna.GetResourceRecords(domain)` | `client.Dns.ListAsync(domain)` |
+| `dna.AddResourceRecord(...)` | `client.Dns.AddAsync(...)` |
+| `dna.SetForwarding(...)` | `client.Domains.Forwarding.SetAsync(...)` |
+| `dna.GetCurrentBalance()` | `client.Account.GetAsync()` |
+| `result["result"] == "ERROR"` | `catch (DomainNameApiException e)` |
 
-| CODE | DETAIL                                                                                                                               |
-|------|--------------------------------------------------------------------------------------------------------------------------------------|
-| 101  | Systeemfout, details voor ({0})!                                                                                                     |
-| 102  | Meerdere fouten, details voor ({0})!                                                                                                 |
-| 103  | Onbekende fouten, details voor ({0})!                                                                                                |
-| 200  | API-commando niet gevonden ({0})!                                                                                                    |
-| 210  | API-service niet gevonden ({0})!                                                                                                     |
-| 211  | API-serviceprovider niet ingesteld!                                                                                                  |
-| 300  | Reseller niet gevonden!                                                                                                              |
-| 301  | Uw huidige IP-adres heeft geen toegang. Zorg ervoor dat u verbinding maakt vanaf een geautoriseerd IP-adres en probeer het opnieuw  |
-| 310  | TLD wordt niet ondersteund!                                                                                                          |
-| 320  | API niet gevonden!                                                                                                                   |
-| 321  | Valuta wordt niet ondersteund!                                                                                                       |
-| 330  | Vereiste parameter(s) niet ingesteld ({0}).                                                                                          |
-| –    | Zorg ervoor dat u alle contactobjecten volledig verzendt                                                                             |
-| 340  | Prijsdefinitie niet gevonden ({0}[{1}]-{2}{3}).                                                                                      |
-| 350  | Onvoldoende resellersaldo. (Reseller Id : {0} - Huidig saldo : {1} {2}).                                                             |
-| 350  | De boekhoudvaluta komt niet overeen of het saldo is onvoldoende.                                                                     |
-| 360  | Ongeldig API-verzoek voor veld ({0}).                                                                                                |
-| 360  | API-quotum overschreden!                                                                                                             |
-| 361  | Fout door throttling (te veel verzoeken)!                                                                                            |
-| 362  | Premiumdomein kan op dit moment niet worden geregistreerd.                                                                           |
-| 363  | Bewerking geannuleerd omdat het domein zich in de periode voor automatische verlenging bevindt                                       |
-| 364  | Dit domein is momenteel niet beschikbaar voor transacties vanwege een probleem bij het register                                      |
+1.x stuurde foutrapporten naar Sentry. 2.0 stuurt nergens iets heen behalve naar de API.
 
-| CODE | DETAIL                                                                                      |
-|------|---------------------------------------------------------------------------------------------|
-| 400  | Ongeldig contact ({0}).                                                                     |
-| 401  | Contactgegevens kunnen niet worden gesynchroniseerd.                                        |
-| 402  | Geen toegang tot contactgegevens bij het register.                                          |
-| 403  | ER ONTBREEKT INFORMATIE IN HET SYSTEEM. VOER UW STANDAARDGEGEVENS IN OF NEEM CONTACT OP MET HET SUPPORTTEAM. |
-| 404  | DOMEINCONTACT KAN NIET WORDEN BIJGEWERKT. TOESTEMMING VAN HET REGISTER VEREIST.             |
-| 410  | Contact niet gevonden.                                                                      |
-| 410  | Contact niet gevonden ({0}).                                                                |
-| 420  | Ongeldig API-commando voor contact {0}.                                                     |
-| 430  | Contact-API niet gevonden.                                                                  |
-| 440  | Contact is niet gesynchroniseerd.                                                           |
-| 450  | Te veel domeincontacten!                                                                    |
-| 451  | Het bijwerken van het contact kon niet worden uitgevoerd.                                   |
+## Links
 
-| CODE | DETAIL                                                                                                                               |
-|------|--------------------------------------------------------------------------------------------------------------------------------------|
-| 500  | Ongeldige domein-id.                                                                                                                 |
-| 500  | Ongeldige domein-id ({0}).                                                                                                           |
-| 501  | Domein kon niet worden gesynchroniseerd ({0})                                                                                        |
-| 502  | Interne transfer mislukt                                                                                                             |
-| 503  | Domeinregistratie is niet beschikbaar.                                                                                               |
-| 504  | Domeingegevens komen niet overeen. Voorheen: {0}                                                                                     |
-| 505  | Voer het IP-adres in.                                                                                                                |
-| 506  | De domeintransfer is gestart, maar de contactgegevens konden niet worden gelezen.                                                    |
-| 507  | Autorisatiefout.                                                                                                                     |
-| 510  | Domein niet gevonden.                                                                                                                |
-| 511  | Verlopen domeinen kunnen niet worden gevonden.                                                                                       |
-| 512  | Domein kan niet worden verlengd.                                                                                                     |
-| 513  | Het domein heeft geen status waarin het kan worden bijgewerkt. Het moet actief zijn om te kunnen worden bijgewerkt                   |
-| 514  | Redemption Period (herstelperiode) verwacht.                                                                                         |
-| 520  | Ongeldig API-commando voor domein "{0}".                                                                                             |
-| 530  | Ongeldige domeinperiode. De periode moet {0} tot {1} jaar zijn. Gevraagde periode is {2} jaar.                                       |
-| 540  | Het domein kan niet verder dan {0} jaar vanaf de huidige datum worden verlengd.                                                      |
-| 550  | Ongeldige domeinnaam. Het domein moet {0} tot {1} tekens lang zijn. De gevraagde domeinnaam is {2} tekens lang.                      |
-| 560  | Ongeldig aantal nameservers. Het domein moet {0} tot {1} nameservers hebben. Gevraagd aantal nameservers is {2}.                     |
-| 561  | Geen nameserverinformatie gevonden in het binnenkomende verzoek                                                                      |
-| 570  | IDN wordt niet ondersteund voor tld "{0}".                                                                                           |
-| 571  | Periode ongeldig.                                                                                                                    |
-| 572  | Commando ongeldig.                                                                                                                   |
-| 573  | Domeinnamen niet gevonden.                                                                                                           |
-| 574  | TLD-namen niet gevonden.                                                                                                             |
-| 575  | Het domein heeft geen status waarin het kan worden bijgewerkt. Het moet actief zijn om de nameservers te kunnen bijwerken            |
-| 576  | Het domein kan in de laatste maand vóór de vervaldatum worden verlengd                                                               |
-| 580  | Transfer wordt niet ondersteund voor tld "{0}".                                                                                      |
-| 581  | Child nameserver niet gevonden                                                                                                       |
-| 582  | Transfer is gestart door een andere reseller.                                                                                        |
-| 583  | Transfer niet geïnitieerd. Neem contact op met het supportteam.                                                                      |
-| 584  | Objectstatus verbiedt bewerking                                                                                                      |
-| 590  | Voor deze transfer is een auth-code vereist.                                                                                         |
-| 591  | Auth-code is ongeldig.                                                                                                               |
-| 592  | Er staat een transferlock op het domein.                                                                                             |
-| 593  | Domein kan niet worden overgedragen; statusinformatie en transferlock moeten aan de vereiste criteria voldoen. (Statusinformatie: #ok) |
-| 594  | Nameserveradres van het domein kon niet worden opgelost ({0})                                                                        |
-| 595  | Contactgegevens kunnen niet worden gelezen (whois.registrar.tld). Zorg ervoor dat de status van de privacybescherming open is          |
-| 596  | Contactgegevens konden niet worden geverifieerd                                                                                      |
-| 597  | TLD niet gevonden                                                                                                                    |
-| 598  | Er is een onbekende fout opgetreden                                                                                                  |
-| 599  | Domeindoorsturing niet gevonden                                                                                                      |
+- [`dna` CLI en MCP-server](https://github.com/domainreseller/cli): dezelfde API vanuit de terminal en vanuit AI-agents.
+- [API-documentatie](https://www.domainnameapi.com/docs/)
+- [Changelog](CHANGELOG.md)
 
 ## Licentie
 
-Apache License 2.0 — zie [LICENSE](LICENSE).
+Apache License 2.0. Zie [LICENSE](LICENSE).

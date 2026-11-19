@@ -4,14 +4,23 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows also runs the tests on .NET Framework 4.8, which exercises the .NET Standard 2.0 build.
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
       - name: Restore
         run: dotnet restore DomainNameApi.sln
       - name: Build
@@ -19,4 +28,5 @@ jobs:
       - name: Test
         run: dotnet test DomainNameApi.sln --configuration Release --no-build --verbosity normal
       - name: Pack (dry run)
+        if: matrix.os == 'ubuntu-latest'
         run: dotnet pack src/DomainNameApi/DomainNameApi.csproj --configuration Release --no-build --output artifacts

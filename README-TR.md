@@ -10,1057 +10,708 @@
   <a href="README-IT.md"> | IT <img style="padding-top: 8px" src="https://raw.githubusercontent.com/yammadev/flag-icons/master/png/IT.png" alt="IT" height="20" /></a>
 </div>
 
-# DomainNameAPI .NET Kütüphanesi (dotnet-dna)
+# DomainNameAPI .NET SDK (dotnet-dna)
 
-DomainNameAPI bayi (reseller) REST API'si için resmi .NET istemcisi: alan adı sorgulama, kayıt, yenileme, transfer, kişi (contact) bilgileri, nameserver'lar, child nameserver'lar, DNS bölgeleri (zone) ve URL yönlendirme.
+<p>
+  <a href="https://github.com/domainreseller/dotnet-dna/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/domainreseller/dotnet-dna/ci.yml?branch=main&label=CI&style=flat-square" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-0B8DB5?style=flat-square" alt="Apache-2.0"></a>
+</p>
 
-dotnet-dna, [php-dna](https://github.com/domainreseller/php-dna) kütüphanesinin birebir karşılığıdır: aynı metotlar, ağa giden aynı istekler ve aynı dönüş değerleri. php-dna'nın uyumluluk (conformance) senaryolarına (134 senaryo) karşı doğrulanır; bu sayede PHP kütüphanesiyle yazılmış kod birebir aktarılabilir.
+[Domain Name API](https://www.domainnameapi.com) bayi platformunun resmi .NET SDK'sı. REST API'nin 64 işleminin
+tamamını tipli istemciler ve modellerle kapsar: alan adları, iletişim bilgileri, DNS, DNSSEC, SSL sertifikaları,
+hosting, siparişler, ürünler ve hesabınız.
 
-## 📦 İndirme — her zaman Releases kullanın!
+```csharp
+using var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Ote);
 
-⬇️ **En güncel test edilmiş sürümü buradan indirin: https://github.com/domainreseller/dotnet-dna/releases/latest**
+var search = await client.Domains.SearchAsync("example.com");
+if (search.Info?.IsAvailable == true)
+{
+    await client.Domains.RegisterAsync("example.com", contact, ["tr.apiname.com", "eu.apiname.com"]);
+}
+```
 
-> ⚠️ Yeşil **Code → Download ZIP** butonunu **kullanmayın** — bu buton ham geliştirme dalını (development branch) indirir. Release paketleri sürümlenmiş, test edilmiş ve canlı kullanıma hazırdır.
+- **Her şey tipli.** Her işlem bir istek sınıfı, her yanıt IntelliSense dokümantasyonlu bir modeldir. Sözlük yok, JSON ayrıştırma yok.
+- **Kendi istekleriniz.** Her istek `BaseRequest`'ten türer. SDK'nın henüz kapsamadığı bir uç nokta için ondan kendi sınıfınızı türetin.
+- **Para harcayan işlemlerde güvenli.** Her istek, okuma mı yaptığını, yazma mı yaptığını, bakiyenizden ücret mi aldığını yoksa bir şey mi sildiğini bildirir. Ücretli istekler asla yeniden denenmez, salt-okunur mod ise her değişikliği engeller.
+- **Yerleşik dayanıklılık.** Hız sınırlarına otomatik uyulur, 429 yanıtları yeniden denenir, okumalarda ağ hataları yeniden denenir.
+- **Net hatalar.** Sabit bir türü, API'nin hata kodunu, alan düzeyinde doğrulama hatalarını, correlation ID'yi ve bir ipucunu taşıyan tek bir istisna türü.
+- **Modern .NET.** İptal destekli async, `IAsyncEnumerable` ile otomatik sayfalama, `IHttpClientFactory` desteği, nullable ek açıklamaları.
+- **Her yerde çalışır.** .NET 10 ve .NET Standard 2.0'ı destekleyen her çalışma zamanı (.NET Framework 4.6.2+, .NET 8, Mono, Unity).
 
-## Kurulum ve Entegrasyon Rehberi
+[Domain Name API CLI'si `dna`](https://github.com/domainreseller/cli)'nın .NET karşılığıdır: aynı API
+dokümanı, aynı güvenlik sınıfları, yeniden deneme kuralları ve hata kodları.
 
-### Minimum Gereksinimler
+## İçindekiler
 
-- .NET 10 veya üzeri, **ya da** .NET Standard 2.0'ı destekleyen herhangi bir çalışma ortamı (.NET Framework 4.6.2+, .NET Core 2.0+, Mono, Xamarin, Unity).
-- Üçüncü taraf bağımlılığı yoktur. Kütüphane `HttpClient` ve `System.Text.Json` kullanır (.NET Standard 2.0'da `System.Text.Json` paketi otomatik olarak eklenir).
+- [Kurulum](#install)
+- [Kimlik bilgileri](#credentials)
+- [Hızlı başlangıç](#quick-start)
+- [Yapılandırma](#configuration)
+- [Kullanım](#usage): [hesap](#account) · [alan adları](#domains) · [iletişim bilgileri](#contacts) · [DNS](#dns) · [DNSSEC](#dnssec) · [SSL](#ssl) · [hosting](#hosting) · [siparişler ve ürünler](#orders-and-products)
+- [İstekler ve `BaseRequest`](#requests-and-baserequest)
+- [Hatalar](#errors)
+- [Güvenlik, yeniden denemeler ve hız sınırları](#safety-retries-and-rate-limits)
+- [Dependency injection](#dependency-injection)
+- [Kodunuzu test etme](#testing-your-code)
+- [Proje yapısı](#project-layout)
+- [Geliştirme](#development)
+- [1.x'ten yükseltme](#upgrading-from-1x)
 
-### Kurulum
+<a id="install"></a>
 
-**A) NuGet paketi** — paket kimliği `DomainNameApi`'dir. Her sürüm `.nupkg` dosyasıyla birlikte yayınlanır; paket NuGet.org'da listelendiğinde doğrudan da kurabilirsiniz:
+## Kurulum
+
+> [!IMPORTANT]
+> **Her zaman [en son sürümü](https://github.com/domainreseller/dotnet-dna/releases/latest) kullanın.** Yayınlanan paketler sürüm numaralıdır ve test edilmiştir.
+> Yeşil **Code → Download ZIP** düğmesi ise geliştirme dalını indirir.
 
 ```bash
 dotnet add package DomainNameApi
 ```
 
-İndirdiğiniz bir `.nupkg` dosyasını kurmak için dosyayı bir klasöre koyun ve o klasörü paket kaynağı olarak kullanın:
+İndirdiğiniz bir `.nupkg` dosyasını kurmak için onu bir klasöre koyun ve o klasörü paket kaynağı olarak kullanın:
 
 ```bash
 dotnet add package DomainNameApi --source ./packages
 ```
 
-**B) Proje referansı** — sürümün kaynak kodunu indirin ve projeye referans verin:
+Ya da bir sürümün kaynağındaki projeye referans verin:
 
 ```bash
 dotnet add reference path/to/dotnet-dna/src/DomainNameApi/DomainNameApi.csproj
 ```
 
-## 🔑 API Bilgileri — Reseller ID ve API Key
+**Gereksinimler:** .NET 10 veya üstü ya da .NET Standard 2.0'ı destekleyen herhangi bir çalışma zamanı. Üçüncü taraf
+bağımlılığı yoktur. .NET Standard 2.0'da paket, Microsoft'un .NET'e dahil olan `System.Text.Json` ve
+`Microsoft.Bcl.AsyncInterfaces` paketlerini ekler.
 
-Kütüphane DomainNameAPI REST API ile konuşur ve constructor'a verilen yalnızca iki bilgiye ihtiyaç duyar:
+<a id="credentials"></a>
 
-| Parametre | Değer |
-|---|---|
-| Birinci | Reseller ID — `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` biçiminde UUID |
-| İkinci | API Key |
+## Kimlik bilgileri
 
-> 💡 **Reseller ID** ve **API Key** bilgilerinizi DomainNameAPI panelinizdeki **API Ayarları** bölümünde bulabilirsiniz.
-> ⚠️ Bunlar **API bilgileridir** — panel giriş bilgileriniz burada **çalışmaz**.
+API her isteği iki değerle doğrular; SDK bunları sizin yerinize gönderir:
 
-```csharp
-using DomainNameApi;
-
-var resellerId = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-var apiKey     = "your-api-key";
-
-// Live environment
-var dna = new DomainNameApiClient(resellerId, apiKey);
-
-// Test (OTE) environment
-var dna = new DomainNameApiClient(resellerId, apiKey, true);
-```
-
-Her iki bilginin başındaki ve sonundaki boşluklar temizlenir. Test modu bayrağı, yapılandırma dosyalarının ve panellerin sakladığı şekilde metin olarak da verilebilir: `"true"`, `"1"`, `"on"` ve `"yes"` (büyük/küçük harf fark etmez) test ortamını seçer, diğer her değer canlı ortamı seçer.
-
-```csharp
-var dna = new DomainNameApiClient(resellerId, apiKey, Environment.GetEnvironmentVariable("DNA_TEST_MODE"));
-```
-
-## 🚀 Hızlı Başlangıç
-
-```csharp
-using System;
-using DomainNameApi;
-
-using var dna = new DomainNameApiClient("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "your-api-key");
-
-var result = dna.GetDetails("example.com");
-
-if ((string)result["result"] == "OK")
-{
-    Console.WriteLine("Status:  " + (string)result["data"]["Status"]);
-    Console.WriteLine("Expires: " + (string)result["data"]["Dates"]["Expiration"]);
-}
-else
-{
-    Console.WriteLine("Error " + (string)result["error"]["Code"] + ": " + (string)result["error"]["Message"]);
-}
-```
-
-### Dönüş değerleri
-
-Her metot, php-dna'nın döndürdüğü yapının aynısını bir `System.Text.Json.Nodes.JsonNode` (genellikle bir `JsonObject`) olarak döndürür. Değerleri tür dönüşümü (cast) veya `GetValue<T>()` ile okuyabilir, sonucun tamamını `ToJsonString()` ile yazdırabilirsiniz:
-
-```csharp
-var details = dna.GetDetails("example.com");
-string status = (string)details["data"]["Status"];          // "Active"
-int    days   = (int)details["data"]["Dates"]["RemainingDays"];
-bool   locked = (string)details["data"]["LockStatus"] == "true";   // flags are the strings "true"/"false"
-Console.WriteLine(details.ToJsonString());
-```
-
-Anahtar adları, metin biçimindeki bayraklar (`"true"`/`"false"`) ve biçimlendirilmiş tutar metinleri (`"11.9900"`) php-dna'dakiyle birebir aynıdır. Çoğu metot `result` = `OK`/`ERROR` zarfını kullanır; `GetCurrentBalance` eski tip `OperationResult` zarfını kullanır, `CheckAvailability` ise başarılı olduğunda doğrudan bir liste döndürür.
-
-Kişi bilgileri, TR öznitelikleri ve liste filtreleri gibi girdiler, php-dna'nın anahtarlarını (`FirstName`, `EMail`, `AddressLine1`, `PhoneCountryCode`, `TRABISCITIZENID`, `PageSize`, ...) kullanan `IDictionary<string, object>` nesneleridir. Nameserver listeleri bir liste (`string[]`, `List<string>`) veya bir sözlük (değerleri kullanılır) olabilir.
-
-### Kullanım
-
-Aşağıdaki tüm örnekler [examples](examples) klasöründen de çalıştırılabilir (bkz. [Örnekler](#örnekler)).
-
-#### Alan Adı Kaydı
-
-Not: .tr alan adları için ek parametreler gereklidir. `additionalAttributes` parametresi, .tr gibi ek bilgi gerektiren alan adlarında kullanılır.
-
-```csharp
-var contact = new Dictionary<string, object>
-{
-    ["FirstName"]        = "John",
-    ["LastName"]         = "Doe",
-    ["Company"]          = "Example Corp",
-    ["EMail"]            = "john.doe@example.com",
-    ["AddressLine1"]     = "123 Lorem Street",
-    ["AddressLine2"]     = "Suite 456",
-    ["AddressLine3"]     = "",
-    ["City"]             = "Springfield",
-    ["Country"]          = "US",
-    ["Fax"]              = "1234567890",
-    ["FaxCountryCode"]   = "1",
-    ["Phone"]            = "9876543210",
-    ["PhoneCountryCode"] = 1,
-    ["Type"]             = "Contact",
-    ["ZipCode"]          = "12345",
-    ["State"]            = "IL",
-};
-
-var result = dna.RegisterWithContactInfo(
-    "example.com",
-    1,
-    new Dictionary<string, object>
-    {
-        ["Administrative"] = contact,
-        ["Billing"]        = contact,
-        ["Technical"]      = contact,
-        ["Registrant"]     = contact,
-    },
-    new[] { "ns1.example.com", "ns2.example.com" },
-    eppLock: true,
-    privacyLock: false,
-    // Additional attributes are only required for .tr domains
-    additionalAttributes: new Dictionary<string, object>
-    {
-        ["TRABISDOMAINCATEGORY"] = 1,
-        ["TRABISCITIZIENID"]     = "12345678901",
-        ["TRABISNAMESURNAME"]    = "John Doe",
-        ["TRABISCOUNTRYID"]      = "840",
-        ["TRABISCITYID"]         = "17",
-    });
-```
-
-Kişi bilgileri gönderilmeden önce tamamlanır: eksik alanlara yer tutucu değerler atanır, isimlerden rakamlar ve noktalama işaretleri temizlenir, eksik veya boş bırakılan eyalet/il bilgisi yerine şehir kullanılır, ülke adları ISO kodlarına çevrilir ve telefon numaraları numara ve ülke kodu olarak ayrıştırılır — kendi `+` veya `00` ülke koduyla yazılmış bir numara bu kodu korur (bkz. `ValidateContact`). Hiç nameserver verilmezse (veya yalnızca boş değerler verilirse) `ns1.domainnameapi.com` ve `ns2.domainnameapi.com` kullanılır. .tr alan adlarında TRABIS öznitelikleri gateway'in kabul ettiği alanlara indirgenir (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`); eski `TRABISCITIZIENID` anahtarı ve sayısal kategori değeri otomatik olarak dönüştürülür.
-
-<details>
-<summary>Alan Adı Kaydı için Örnek Çıktı</summary>
-
-```json
-{
-  "data": {
-    "ID": 123456,
-    "Status": "Active",
-    "DomainName": "example.com",
-    "AuthCode": "Xy9#mK2$pL5@vN8",
-    "LockStatus": "true",
-    "PrivacyProtectionStatus": "false",
-    "IsChildNameServer": "false",
-    "Contacts": {
-      "Billing": { "ID": 987654 },
-      "Technical": { "ID": 987654 },
-      "Administrative": { "ID": 987654 },
-      "Registrant": { "ID": 987654 }
-    },
-    "Dates": { "Start": "2024-03-15T10:00:00", "Expiration": "2025-03-15T10:00:00", "RemainingDays": 365 },
-    "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-    "Additional": [],
-    "ChildNameServers": []
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-Gateway siparişi reddederse (`"success": false` yanıtı verirse), metot `Code` = `REGISTER_DOMAIN` ve gateway'in mesajını içeren bir hata zarfı döndürür; böylece reddedilen bir kayıt asla tamamlanmış gibi bildirilmez. `Renew` (`RENEW_DOMAIN`) ve `Transfer` (`TRANSFER_DOMAIN`) de aynı şekilde davranır.
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Yenileme
-
-```csharp
-var result = dna.Renew("example.com", 1);
-```
-
-<details>
-<summary>Alan Adı Yenileme için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "ExpirationDate": "2025-03-15T10:00:00" } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Transferi
-
-```csharp
-var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
-```
-
-> ℹ️ Transfer işleminde kişi bilgileri asla gönderilmez: istek her zaman boş bir kişi listesi taşır ve kişi bilgilerini kayıt firması (registrar) kendisi devralır. Bu nedenle `Transfer` metodunun kişi bilgisi parametresi yoktur; gerekirse transfer tamamlandıktan sonra kişi bilgilerini `SaveContacts` ile güncelleyin.
-
-<details>
-<summary>Alan Adı Transferi için Örnek Çıktı</summary>
-
-```json
-{
-  "data": {
-    "ID": 0, "Status": "Active", "DomainName": "", "AuthCode": "",
-    "LockStatus": "false", "PrivacyProtectionStatus": "false", "IsChildNameServer": "false",
-    "Contacts": { "Billing": { "ID": 0 }, "Technical": { "ID": 0 }, "Administrative": { "ID": 0 }, "Registrant": { "ID": 0 } },
-    "Dates": { "Start": "", "Expiration": "2027-11-09T12:00:00", "RemainingDays": 365 },
-    "NameServers": [], "Additional": [], "ChildNameServers": []
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Transferi İptal Etme, Onaylama veya Reddetme
-
-```csharp
-dna.CancelTransfer("example.com");   // pending incoming transfer
-dna.ApproveTransfer("example.com");  // pending outgoing transfer
-dna.RejectTransfer("example.com");   // pending outgoing transfer
-```
-
-<details>
-<summary>Transfer İptali için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "DomainName": "example.com", "Status": "Cancelled" } }
-```
-
-`ApproveTransfer` ve `RejectTransfer` da aynı şekilde, sırasıyla `Approved` / `Rejected` ile yanıt verir.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Transfer Kontrolü
-
-```csharp
-var result = dna.CheckTransfer("example.com", "Ab1!xyZ9");
-```
-
-`result` yalnızca kayıt otoritesi (registry) alan adının transfer edilebilir olduğunu bildirdiğinde `OK` olur; aksi halde `Code` = `TRANSFER_NOT_AVAILABLE` ile `ERROR` döner ve ayrıntılar yine `data` altında yer alır.
-
-<details>
-<summary>Transfer Kontrolü için Örnek Çıktı</summary>
-
-```json
-{
-  "result": "OK",
-  "data": {
-    "TransferAvailabilityStatus": true,
-    "AuthCodeIsRequired": true,
-    "AuthCodeIsValid": true,
-    "UserTransferRequired": false,
-    "TransferLock": false,
-    "Message": "Domain can be transferred",
-    "MessageKey": "TransferAvailable",
-    "Additional": []
-  }
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Listesi
-
-```csharp
-var result = dna.GetList(new Dictionary<string, object>
-{
-    ["OrderColumn"]    = "Id",
-    ["OrderDirection"] = "ASC",
-    ["PageNumber"]     = 0,
-    ["PageSize"]       = 1000,
-});
-```
-
-`PageNumber` sıfırdan başlar. Gateway'in kendi filtre adları (`MaxResultCount`, `SkipCount`, `Sorting`, `DomainName`, ...) da kullanılabilir.
-
-<details>
-<summary>Alan Adı Listesi için Örnek Çıktı</summary>
-
-```json
-{
-  "data": {
-    "Domains": [
-      {
-        "ID": 564346,
-        "Status": "Active",
-        "DomainName": "example.com",
-        "AuthCode": "",
-        "LockStatus": "false",
-        "PrivacyProtectionStatus": "false",
-        "IsChildNameServer": "false",
-        "Contacts": { "Billing": { "ID": "" }, "Technical": { "ID": "" }, "Administrative": { "ID": "" }, "Registrant": { "ID": "" } },
-        "Dates": { "Start": "2024-03-15T10:00:00", "Expiration": "2025-03-15T10:00:00", "RemainingDays": 365 },
-        "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-        "Additional": [],
-        "ChildNameServers": []
-      }
-    ]
-  },
-  "result": "OK",
-  "TotalCount": 1
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### TLD Listesi
-
-```csharp
-var result = dna.GetTldList(100);
-```
-
-<details>
-<summary>TLD Listesi için Örnek Çıktı</summary>
-
-```json
-{
-  "data": [
-    {
-      "id": 1,
-      "status": "Active",
-      "maxchar": 63,
-      "maxperiod": 10,
-      "minchar": 1,
-      "minperiod": 1,
-      "tld": "com",
-      "pricing": {
-        "registration": { "1": "10.8100" },
-        "renew": { "1": "11.0100" },
-        "transfer": { "1": "10.6100" },
-        "restore": { "1": "99.9000" }
-      },
-      "currencies": { "registration": "USD", "renew": "USD", "transfer": "USD", "restore": "USD" }
-    }
-  ],
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Uygunluk Kontrolü
-
-```csharp
-var result = dna.CheckAvailability(new[] { "hello", "world123x0" }, new[] { "com", "net" }, 1, "create");
-```
-
-<details>
-<summary>Alan Adı Uygunluk Kontrolü için Örnek Çıktı</summary>
-
-```json
-[
-  {
-    "TLD": "com", "DomainName": "hello", "Status": "notavailable", "Command": "create", "Period": 1,
-    "IsFee": false, "Price": "10.8100", "Currency": "USD", "Reason": "Domain exists"
-  },
-  {
-    "TLD": "com", "DomainName": "world123x0", "Status": "available", "Command": "create", "Period": 1,
-    "IsFee": false, "Price": "10.8100", "Currency": "USD", "Reason": null
-  }
-]
-```
-
-Hata durumunda metot liste yerine olağan hata zarfını döndürür; bu yüzden önce `result is JsonArray` kontrolü yapın.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Detayları
-
-```csharp
-var result = dna.GetDetails("example.com");
-var synced = dna.SyncFromRegistry("example.com"); // same envelope
-```
-
-<details>
-<summary>Alan Adı Detayları için Örnek Çıktı</summary>
-
-```json
-{
-  "data": {
-    "ID": 564346,
-    "Status": "Active",
-    "DomainName": "example.com",
-    "AuthCode": "DHQ!K52",
-    "LockStatus": "true",
-    "PrivacyProtectionStatus": "false",
-    "IsChildNameServer": "true",
-    "Contacts": {
-      "Billing": { "ID": "DNA-B-4" },
-      "Technical": { "ID": "DNA-T-3" },
-      "Administrative": { "ID": "DNA-A-2" },
-      "Registrant": { "ID": "DNA-R-1" }
-    },
-    "Dates": { "Start": "2025-05-26T16:08:37", "Expiration": "2027-05-26T16:08:37", "RemainingDays": 449 },
-    "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-    "Additional": [],
-    "ChildNameServers": [ { "ns": "ns1.example.com", "ip": "1.2.3.4" } ]
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Nameserver Değiştirme
-
-```csharp
-var result = dna.ModifyNameServer("example.com", new[] { "ns1.example.com", "ns2.example.com" });
-```
-
-Sunucu adlarının baş ve sonundaki boşluklar kırpılır, küçük harfe çevrilir ve sondaki nokta kaldırılır; boş ve tekrarlanan girdiler atılır.
-
-<details>
-<summary>Nameserver Değiştirme için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "NameServers": [ "ns1.example.com", "ns2.example.com" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Kilidini Etkinleştirme
-
-```csharp
-var result = dna.EnableTheftProtectionLock("example.com");
-```
-
-<details>
-<summary>Alan Adı Kilidini Etkinleştirme için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "LockStatus": true } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Kilidini Kaldırma
-
-```csharp
-var result = dna.DisableTheftProtectionLock("example.com");
-```
-
-<details>
-<summary>Alan Adı Kilidini Kaldırma için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "LockStatus": false } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Child Nameserver Ekleme
-
-```csharp
-var result = dna.AddChildNameServer("example.com", "ns1.example.com", "1.2.3.4");
-```
-
-<details>
-<summary>Child Nameserver Ekleme için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com", "IPAdresses": [ "1.2.3.4" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Child Nameserver Silme
-
-```csharp
-var result = dna.DeleteChildNameServer("example.com", "ns1.example.com");
-```
-
-<details>
-<summary>Child Nameserver Silme için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com" } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Child Nameserver Güncelleme
-
-```csharp
-var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.4");
-```
-
-<details>
-<summary>Child Nameserver Güncelleme için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com", "IPAdresses": [ "1.2.3.4" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Gizliliğini Değiştirme
-
-```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
-
-// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
-var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
-```
-
-İsteğe bağlı üçüncü argüman (`reason`) yalnızca uyumluluk için korunmuştur; gateway'de böyle bir alan yoktur ve gönderilmez.
-
-<details>
-<summary>Alan Adı Gizliliğini Değiştirme için Örnek Çıktı</summary>
-
-```json
-{ "data": { "PrivacyProtectionStatus": true }, "result": "OK" }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Kişi Bilgilerini Alma
-
-```csharp
-var result = dna.GetContacts("example.com");
-```
-
-<details>
-<summary>Alan Adı Kişi Bilgilerini Alma için Örnek Çıktı</summary>
-
-```json
-{
-  "data": {
-    "contacts": {
-      "Administrative": {
-        "ID": "DNA-A-2",
-        "Status": "Active",
-        "AuthCode": "",
-        "FirstName": "Grace",
-        "LastName": "Hopper",
-        "Company": "",
-        "EMail": "grace@example.com",
-        "Type": "Administrative",
-        "Address": {
-          "Line1": "Example Street 2", "Line2": "", "Line3": "",
-          "State": "DC", "City": "Washington", "Country": "US", "ZipCode": "20001"
-        },
-        "Phone": {
-          "Phone": { "Number": "2025550100", "CountryCode": "1" },
-          "Fax": { "Number": "2025550101", "CountryCode": "1" }
-        },
-        "Additional": []
-      },
-      "Billing": { "...": "..." },
-      "Registrant": { "...": "..." },
-      "Technical": { "...": "..." }
-    }
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Alan Adı Kişi Bilgilerini Kaydetme
-
-```csharp
-var contact = new Dictionary<string, object>
-{
-    ["FirstName"]        = "John",
-    ["LastName"]         = "Doe",
-    ["Company"]          = "Example Corp",
-    ["EMail"]            = "john@example.com",
-    ["AddressLine1"]     = "123 Main Street",
-    ["AddressLine2"]     = "",
-    ["AddressLine3"]     = "",
-    ["City"]             = "Springfield",
-    ["Country"]          = "US",
-    ["Fax"]              = "5559876543",
-    ["FaxCountryCode"]   = "1",
-    ["Phone"]            = "5551234567",
-    ["PhoneCountryCode"] = 1,
-    ["Type"]             = "Contact",
-    ["ZipCode"]          = "62701",
-    ["State"]            = "IL",
-};
-
-var result = dna.SaveContacts("example.com", new Dictionary<string, object>
-{
-    ["Administrative"] = contact,
-    ["Billing"]        = contact,
-    ["Technical"]      = contact,
-    ["Registrant"]     = contact,
-});
-```
-
-Kişi bilgileri, `GetContacts`'ın döndürdüğü iç içe yapıyı da (`Address` → `Line1`/`City`/..., `Phone` → `Phone`/`Fax` → `Number`/`CountryCode`) kullanabilir.
-
-<details>
-<summary>Alan Adı Kişi Bilgilerini Kaydetme için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "contacts": [] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Bayi Bilgilerini Alma
-
-```csharp
-var result = dna.GetResellerDetails();
-```
-
-<details>
-<summary>Bayi Bilgilerini Alma için Örnek Çıktı</summary>
-
-```json
-{
-  "result": "OK",
-  "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "active": true,
-  "name": "Example Reseller",
-  "balance": "500.00",
-  "currency": "USD",
-  "symbol": "$",
-  "balances": [
-    { "balance": "500.00", "currency": "USD", "symbol": "$" },
-    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
-  ]
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Güncel Bakiye
-
-```csharp
-var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
-```
-
-<details>
-<summary>Güncel Bakiye için Örnek Çıktı</summary>
-
-```json
-{
-  "ErrorCode": 0,
-  "OperationMessage": "Command completed succesfully.",
-  "OperationResult": "SUCCESS",
-  "Balance": "601.64",
-  "CurrencyId": 2,
-  "CurrencyInfo": null,
-  "CurrencyName": "USD",
-  "CurrencySymbol": "$"
-}
-```
-
-Hata durumunda `OperationResult` değeri `FAILED` olur, `ErrorCode` hata kodunu (örneğin `API_429`) içerir ve `Balance` değeri `"0.00"` olur. Hesap yalnızca USD ve TRY bakiyelerini bildirir; başka bir para birimi (EUR, GBP, ...) istendiğinde `ErrorCode` = `BALANCE` ve `No EUR balance is reported for this account. Available: USD, TRY.` mesajıyla hata döner.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### DNS Bölgesi (Zone) Yönetimi
-
-Gateway bir bölgeyi kayıt **kümeleri** (ad + tür → değerler) olarak saklar ve her yazma işleminde kümenin tamamını değiştirir. `*ResourceRecordSet` ve `*ResourceRecordValue` metotları bunu sizin yerinize halleder. Adlar göreli (`www`), kök alan adı (`@`, `""` veya `example.com`) ya da tam nitelikli (`www.example.com.`) olabilir. Desteklenen türler: `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. `apply: false` verip `ApplyResourceRecords`'u kendiniz çağırmadığınız sürece yazma işlemleri anında uygulanır; bu otomatik uygulama başarısız olursa metot uygulama hatasını döndürür (değişiklik hazırlanmış olarak bekler, yayına alınmaz). Ardışık bölge çağrıları arasında en az bir saniye bırakılır, çünkü gateway art arda gelen isteklere HTTP 429 ile yanıt verir.
-
-```csharp
-// List every record (one row per value; names are fully qualified)
-var records = dna.GetResourceRecords("example.com");
-
-// Make a set hold exactly these values
-dna.SetResourceRecordSet("example.com", "@", "MX", new[] { "10 mx1.example.com", "20 mx2.example.com" }, 3600);
-
-// Add / remove / replace one value, keeping the others
-dna.AddResourceRecordValue("example.com", "@", "MX", "30 mx3.example.com");
-dna.RemoveResourceRecordValue("example.com", "@", "MX", "20 mx2.example.com.");
-dna.ReplaceResourceRecordValue("example.com", "@", "A", "192.0.2.1", "192.0.2.2");
-
-// Remove a whole set
-dna.DeleteResourceRecordSet("example.com", "old", "A");
-
-// Low-level calls (one write = one set)
-dna.AddResourceRecord("example.com", "www", "A", "192.0.2.5", 300);
-dna.EditResourceRecord("example.com", "www", "www", "A", "192.0.2.6", 600);
-dna.DeleteResourceRecord("example.com", "www", "192.0.2.6", "A");
-
-// Stage several changes, then commit once
-dna.AddResourceRecord("example.com", "api", "A", "192.0.2.7", 300, apply: false);
-dna.AddResourceRecord("example.com", "cdn", "CNAME", "cdn.example.net.", 300, apply: false);
-dna.ApplyResourceRecords("example.com");
-```
-
-<details>
-<summary>DNS Bölgesi Yönetimi için Örnek Çıktı</summary>
-
-`GetResourceRecords`:
-
-```json
-{
-  "result": "OK",
-  "data": {
-    "records": [
-      { "Name": "example.com.", "Type": "A", "TTL": 3600, "Content": "192.0.2.1", "Disabled": false },
-      { "Name": "www.example.com.", "Type": "CNAME", "TTL": 300, "Content": "example.com.", "Disabled": false },
-      { "Name": "example.com.", "Type": "MX", "TTL": 3600, "Content": "10 mx1.example.com.", "Disabled": false }
-    ]
-  }
-}
-```
-
-`SetResourceRecordSet` / `AddResourceRecordValue` (tür büyük harfle, TTL ise gönderildiği şekliyle ve 1–86400 saniye ile sınırlandırılarak bildirilir):
-
-```json
-{ "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
-```
-
-Zaten mevcut olan bir değeri eklemek ya da bulunmayan bir değeri kaldırmak hiçbir şeyi değiştirmez ve `{"result":"OK","data":{..., "Changed": false}}` yanıtını döndürür. Desteklenmeyen bir tür, herhangi bir çağrı yapılmadan reddedilir:
-
-```json
-{ "result": "ERROR", "error": { "Code": "ADD_ZONE", "Message": "Record type \"NS\" is not supported by the DNS zone API. Supported types: A, AAAA, ALIAS, CAA, CNAME, DS, MX, NAPTR, PTR, SRV, TLSA, TXT.", "Details": "..." } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### URL Yönlendirme
-
-```csharp
-dna.SetForwarding("example.com", "https://www.example.org", "Standard"); // or "Frame" (masked)
-var forwarding = dna.GetForwarding("example.com");
-dna.DeleteForwarding("example.com");
-```
-
-<details>
-<summary>URL Yönlendirme için Örnek Çıktı</summary>
-
-```json
-{ "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
-```
-
-Herhangi bir yönlendirme tanımlı değilse (gateway `Redirect information not found` yanıtı verir) `GetForwarding`, `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}` döndürür. Diğer tüm hatalar — örneğin var olmayan bir alan adı — hata olarak döndürülür.
-
-`DeleteForwarding`, `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}` döndürür; hiçbir yönlendirme tanımlı değilse hiçbir şey yapmaz ve `"Removed": false` yanıtını verir.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Yardımcı Metotlar (ağ bağlantısı gerektirmez)
-
-```csharp
-bool isTr = dna.IsTrTLD("example.com.tr"); // true
-
-var contact = dna.ValidateContact(new Dictionary<string, object>
-{
-    ["FirstName"] = " Jo ",
-    ["Phone"]     = "+1 (202) 555-0100",
-    ["Country"]   = "Turkey",
-});
-```
-
-<details>
-<summary>ValidateContact için Örnek Çıktı</summary>
-
-```json
-{
-  "FirstName": "Jo", "Phone": "12025550100", "Country": "TR", "LastName": "Isimyok",
-  "AddressLine1": "Addres yok", "City": "ISTANBUL", "State": "ISTANBUL", "ZipCode": "34000",
-  "PhoneCountryCode": "90", "Fax": "", "FaxCountryCode": ""
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-### Hata Yönetimi
-
-Metotlar API veya ağ sorunlarında asla istisna (exception) fırlatmaz; bunun yerine bir hata zarfı döndürür:
-
-```json
-{
-  "result": "ERROR",
-  "error": {
-    "Code": "API_404",
-    "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again.",
-    "GatewayCode": "Dna.DomainService:Domain:10007"
-  }
-}
-```
-
-| Durum | `Code` | `Message` |
+| Değer | Başlık | Nerede bulunur |
 |---|---|---|
-| Gateway'den dönen HTTP hatası | `API_<status>`, örn. `API_400`, `API_429`, `API_500` | gateway'in mesajı; gövde boşsa `HTTP 429 - Too Many Requests` |
-| Hatalı API bilgileri (HTTP 301/302) | `API_302` | `Invalid API credentials` |
-| Doğrulama hataları | `API_400` | gateway'in mesajı; `Details` ilgili alanları listeler, örn. `Admin PostalCode - 'PostalCode' is required` |
-| Zaman aşımı | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| Diğer ağ hataları (DNS, bağlantı, TLS, bağlantı sıfırlanması) | `CURL_6`, `CURL_7`, `CURL_60`, `CURL_56` | `Curl error during request: ...` |
-| Kayıt, yenileme veya transfer reddedildi (`"success": false`) | `REGISTER_DOMAIN`, `RENEW_DOMAIN`, `TRANSFER_DOMAIN` | gateway'in mesajı |
-| Boş veya kullanılamaz başarılı yanıt | `RESPONSE` | `Invalid response received from server! Response is empty.` |
-| Gateway çağrılmadan önce yapılan kontroller | örn. `AVAILABILITY`, `ADD_ZONE`, `SET_FORWARD` | sorunun açıklaması |
+| Reseller ID (bir UUID) | `__reseller` | Bayi paneli → **API ayarları** |
+| API anahtarı | `X-API-KEY` | Bayi paneli → **API ayarları** |
 
-`API_<n>` kodları her zaman bir HTTP durum kodunu ifade eder. Gateway kendi hata kodunu gönderdiğinde zarf bu kodu `GatewayCode` olarak da taşır (örneğin `Dna.DomainService:Domain:10007`); böylece mesajı ayrıştırmadan "alan adı bulunamadı" ile "TLD desteklenmiyor" durumlarını birbirinden ayırabilirsiniz. Ağ hataları `CURL_<n>` kodunu kullanır; buradaki sayı, kodların php-dna ile eşleşmesi için libcurl'ün numaralandırmasını izler. Yalnızca programlama hataları (örneğin desteklenmeyen bir nesne türü vermek) istisna fırlatabilir.
+> [!NOTE]
+> Bunlar **API kimlik bilgileridir**: panel girişiniz burada çalışmaz. **Canlı ortam ve OTE (test ortamı) farklı
+> API anahtarları kullanır.** Birini diğerinde kullanmak `INVALID_API_KEY` veya `INVALID_RESELLER` hatasıyla sonuçlanır.
 
-Sorun giderme için son çağrı incelenebilir:
+<a id="quick-start"></a>
+
+## Hızlı başlangıç
 
 ```csharp
-dna.GetLastFunction();       // "request:GET domains/info"
-dna.GetRequestData();        // { "url": ..., "method": ..., "payload": ... }
-dna.GetResponseData();       // decoded response, or { "raw_response": "..." }
-dna.GetResponseHeaders();    // { "url", "http_code", "content_type", "total_time", "headers" }
-dna.GetParsedResponseData(); // parsed response or the error built from it
+using DomainNameApi;
+using DomainNameApi.Contacts;
+using DomainNameApi.Domains;
+
+// OTE is the test environment: real API, its own data, no real money.
+using var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Ote);
+
+// 1. Check the credentials and the balance.
+var account = await client.Account.GetAsync();
+Console.WriteLine($"{account.ResellerName}: {account.UsdBalance} USD");
+
+// 2. Is the domain available, and at what price?
+var search = await client.Domains.SearchAsync("my-new-domain.com");
+Console.WriteLine($"{search.Info?.Status} {search.Info?.Price} {search.Info?.Currency}");
+
+// 3. Register it with one contact for all four roles. This charges the balance.
+var contact = new ContactInfo
+{
+    FirstName = "Ada", LastName = "Lovelace", Email = "ada@example.com",
+    Address = "1 Example Street", City = "Istanbul", State = "Istanbul", PostalCode = "34000",
+    Country = "TR", PhoneCountryCode = "90", Phone = "5551234567",
+};
+var result = await client.Domains.RegisterAsync("my-new-domain.com", contact, ["tr.apiname.com", "eu.apiname.com"]);
+Console.WriteLine($"{result.Status}, expires {result.ExpirationDate:d}");
+
+// 4. List every domain, page by page.
+await foreach (var domain in client.Domains.ListAllAsync())
+{
+    Console.WriteLine($"{domain.DomainName} expires in {domain.RemainingDays} days");
+}
 ```
 
-### Test Modu
+[Örnekler projesi](examples/DomainNameApi.Examples), bunlara benzer senaryoları OTE'ye karşı çalıştırır:
 
-Canlı ortam (`https://api.domainresellerapi.com/api/v1`) yerine OTE test ortamını (`https://ote.domainresellerapi.com/api/v1`) kullanmak için constructor'ın üçüncü argümanı olarak `true` verin. `GetServiceUrl()` kullanılan adresi gösterir, `SetServiceUrl(url)` ise bu adresi değiştirir.
+```bash
+dotnet run --project examples/DomainNameApi.Examples -- search example.com
+```
 
-### Hata raporlama (telemetri)
+<a id="configuration"></a>
 
-Bir API çağrısı başarısız olduğunda kütüphane, DomainNameAPI'nin kendi hata takip sistemine (Sentry) bir hata raporu gönderebilir. Başarılı çağrıların rastgele seçilen küçük bir kısmı (%4, ayrıca 1 saniyeden uzun süren her çağrı) performans kaydı olarak gönderilebilir. Bu, DomainNameAPI'nin sorunları bulup düzeltmesine yardımcı olur. Hata raporlama **varsayılan olarak açıktır**.
+## Yapılandırma
 
-**Gönderilenler:**
-
-- hata kodu ve mesajı
-- çağrılan uç nokta yolu ve HTTP yöntemi
-- çağrı süresi
-- uygulama adı (`DomainNameAPI-DotNet`), kütüphane sürümü ve .NET sürümü
-- bayi kimliği (Reseller ID) ve alan adı
-- sunucunun genel (public) IP adresi (arka planda `api.ipify.org` üzerinden öğrenilir)
-- uygulamanın altında çalıştığı işletim sistemi hesabının adı
-- API isteği ve yanıtı, alan adının kişi bilgileri dahil; yalnızca kimlik bilgileri maskelenir — EPP/transfer kodları, API anahtarları, parolalar ve token'lar `***` ile değiştirilir
-
-**Asla gönderilmeyenler:** okunabilir biçimde EPP/transfer kodları, API anahtarları, parolalar veya token'lar; hata izlerindeki (stack trace) metot argümanları.
-
-**Neden ve ne kadar süre:** veriler yalnızca kullanım ölçümü ve sorunların erken teşhisi için kullanılır; DomainNameAPI'nin kendi Sentry sunucusunda 30 gün saklanır, ardından otomatik olarak silinir.
-
-Raporlar arka planda gönderilir: çağrınızı asla engellemez ya da yavaşlatmaz ve asla istisna fırlatmaz. Beklenen ve yüksek hacimli hatalar (alan adı bulunamadı, yetersiz bakiye, hatalı API bilgileri, tanımlı yönlendirme olmaması, ...) raporlanmaz.
-
-**Nasıl kapatılır:** istemciyi oluşturduktan sonra `SetErrorReportingEnabled(false)` çağırın:
+Bir istemci oluşturmanın dört yolu vardır:
 
 ```csharp
-var dna = new DomainNameApiClient(resellerId, apiKey);
-dna.SetErrorReportingEnabled(false);
+// Credentials and environment
+var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Production);
+
+// All settings
+var client = new DomainNameApiClient(new DomainNameApiOptions
+{
+    ResellerId = resellerId,
+    ApiKey = apiKey,
+    Environment = ApiEnvironment.Ote,
+    Timeout = TimeSpan.FromSeconds(30),
+    ReadOnly = true,
+});
+
+// The same environment variables the dna CLI reads
+var client = DomainNameApiClient.FromEnvironment();
+
+// On top of your own HttpClient (for example from IHttpClientFactory)
+var client = new DomainNameApiClient(httpClient, options);
 ```
 
-**Minimal mod:** `SetTelemetryMinimal(true)` raporlamayı açık tutar, ancak yalnızca hata kodu ve mesajını, uç noktayı, süre bilgisini, sürümleri ve bayi kimliğini gönderir — istek/yanıt verisi, alan adı, IP adresi veya hesap adı gönderilmez.
+| Seçenek | Varsayılan | Anlamı |
+|---|---|---|
+| `ResellerId`, `ApiKey` | (zorunlu) | Kimlik bilgileri. |
+| `Environment` | `Production` | `Production` (`https://api.domainresellerapi.com`) veya `Ote` (`https://ote.domainresellerapi.com`). |
+| `BaseAddress` | yok | Ortamın adresini geçersiz kılar, örneğin bir proxy için. |
+| `Timeout` | 60 sn | Tek bir denemenin zaman sınırı. |
+| `MaxRetries` | 2 | Başarısız bir isteğin kaç kez tekrarlanacağı ([yeniden denemeler](#safety-retries-and-rate-limits) bölümüne bakın). 0, yeniden denemeyi kapatır. |
+| `MaxRetryDelay` | 30 sn | Bir yeniden denemeden önceki en uzun bekleme. |
+| `PaceRequests` | `true` | İstekleri, geçidin hız sınırlarının altında kalacak şekilde aralıklar. |
+| `ReadOnly` | `false` | Okuma olmayan her isteği, gönderilmeden önce engeller. |
+| `UserAgent` | `DomainNameAPI-DotNet/<version>` | `User-Agent` başlığı. |
 
-Hedef adres `TelemetryDsn` özelliği ile değiştirilebilir (örneğin kendi Sentry projenize).
+`FromEnvironment()` şunları okur:
 
-> 🔒 **Güvenlik:** TLS sertifika doğrulaması açıktır. CA paketi güncel olmayan bir sunucuda `dna.SetSslVerification(false);` ile kapatılabilir — önerilmez; CA paketini güncellemek daha doğru çözümdür.
+| Değişken | Anlamı |
+|---|---|
+| `DNA_RESELLER_ID`, `DNA_API_KEY` | Kimlik bilgileri. |
+| `DNA_ENV` | `production` veya `ote` (ayrıca `prod`, `live`, `test`, `sandbox`). |
+| `DNA_TEST_MODE` | `true`, `1`, `on` veya `yes` OTE'yi seçer. `DNA_ENV` ayarlı değilse kullanılır. |
+| `DNA_BASE_URL` | İsteğe bağlı temel adres geçersiz kılma. |
+| `DNA_READ_ONLY` | `true`, salt-okunur modu açar. |
 
-### Gelişmiş Kullanım
+İstemci thread-safe'tir. Her kimlik bilgisi kümesi için bir tane oluşturun ve uygulamanın ömrü boyunca yeniden kullanın.
 
-- **Zaman aşımları:** istek başına 30 saniye, bağlantı için 10 saniye; `Timeout` ve `ConnectTimeout` özellikleriyle değiştirilebilir.
-- **Özel taşıma katmanı (transport):** istekleri kendi HTTP altyapınız, bir proxy veya bir test dublörü üzerinden yönlendirmek için constructor'a bir `IHttpTransport` verin (`new DomainNameApiClient(id, key, false, transport)`) ya da `Transport` özelliğini ayarlayın. Uygulamalar her HTTP durum kodunu olduğu gibi döndürür (yönlendirmeler takip edilmez) ve ağ hatalarında `TransportException` fırlatır.
-- **İş parçacıkları (thread):** bir istemci, tanılama amacıyla son isteği ve yanıtı saklar ve thread-safe değildir. Her iş parçacığı (veya her istek) için ayrı bir örnek kullanın ya da erişimi senkronize edin. `Dispose()` alttaki `HttpClient`'ı serbest bırakır.
-- **User-Agent:** istekler `DomainNameAPI-DotNet/1.0.1` olarak gönderilir.
+<a id="usage"></a>
 
-### Örnekler
+## Kullanım
 
-[examples](examples/DomainNameApi.Examples) projesi her metot için çalıştırılabilir bir dosya içerir (`GetDetails`, `RegisterWithContactInfo`, `RegisterWithContactInfo-TR`, DNS bölgesi ve yönlendirme metotları, ...). API bilgilerinizi tanımlayın ve birini çalıştırın:
+API'nin her alanının kendi istemcisi vardır. Metotlar basit argümanlar alır; daha fazla seçenek için her metodun istek
+nesnesini alan bir aşırı yüklemesi (veya kardeş metodu) da vardır.
 
-```bash
-export DNA_RESELLER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-export DNA_API_KEY=your-api-key
-export DNA_TEST_MODE=true   # optional: use the OTE test environment
+<a id="account"></a>
 
-dotnet run --project examples/DomainNameApi.Examples -- GetDetails
-dotnet run --project examples/DomainNameApi.Examples            # lists all examples
+### Hesap
+
+```csharp
+var account = await client.Account.GetAsync();             // ResellerId, ResellerName, TryBalance, UsdBalance
+
+// This month's charges, across all pages
+var request = new ListTransactionsRequest
+{
+    ChargeType = ChargeType.Subtract,
+    StartDate = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero),
+    TransactionTypes = { TransactionType.Register, TransactionType.Renew },
+};
+await foreach (var transaction in client.Account.ListAllTransactionsAsync(request))
+{
+    Console.WriteLine($"{transaction.CreationTime:d} {transaction.Type} {transaction.Amount} {transaction.AmountCurrency}");
+}
 ```
 
-### Testler
+<a id="domains"></a>
 
-Testler herhangi bir API bilgisine ihtiyaç duymaz ve dışarıya ağ çağrısı yapmaz:
+### Alan adları
+
+**Arama**
+
+```csharp
+var one = await client.Domains.SearchAsync("example.com", currency: "USD");
+bool available = one.Info?.IsAvailable == true;
+
+var many = await client.Domains.BulkSearchAsync(["example.com", "example.net", "example.com.tr"]);
+foreach (var domain in many.Available)
+{
+    Console.WriteLine($"{domain.DomainName}: {domain.Price} {domain.Currency}");
+}
+```
+
+**Listeleme ve ayrıntılar**
+
+```csharp
+var page = await client.Domains.ListAsync(new ListDomainsRequest { MaxResultCount = 50, Statuses = { DomainStatus.Active } });
+
+await foreach (var domain in client.Domains.ListAllAsync(new ListDomainsRequest { DomainName = "example" }))
+{
+    Console.WriteLine($"{domain.DomainName} {domain.Status} {domain.ExpirationDate:d}");
+}
+
+var details = await client.Domains.GetAsync("example.com");
+Console.WriteLine(details.AuthCode);
+Console.WriteLine(details.GetContact(ContactType.Registrant)?.Email);
+```
+
+**Kayıt, yenileme, transfer, geri yükleme** (bunlar bakiyenizden ücret alır)
+
+```csharp
+// One contact for all four roles
+await client.Domains.RegisterAsync("example.com", contact, ["tr.apiname.com", "eu.apiname.com"], years: 2);
+
+// Full control: different contacts per role, registry attributes, trustee service
+await client.Domains.RegisterAsync(new RegisterDomainRequest("example.com.tr")
+{
+    Period = 1,
+    NameServers = { "tr.apiname.com", "eu.apiname.com" },
+    Contacts = DomainContact.ForAllRoles(contact),
+    TldAttributes = new() { ["<key>"] = "<value>" },   // the keys: (await client.Products.GetTldAsync("com.tr"))!.Attributes
+});
+
+// With existing contact handles
+await client.Domains.RegisterWithHandleAsync("example.com", "DNA-12345", ["tr.apiname.com", "eu.apiname.com"]);
+
+var renewal = await client.Domains.CheckRenewalAsync("example.com");   // free
+if (renewal.IsRenewable)
+{
+    await client.Domains.RenewAsync("example.com", years: 1);
+}
+
+var check = await client.Domains.CheckTransferAsync("example.com", "EPP-CODE");  // free
+if (check.IsTransferable)
+{
+    await client.Domains.TransferAsync("example.com", "EPP-CODE");
+}
+
+await client.Domains.RestoreAsync("example.com");
+```
+
+İstekler gönderilmeden önce denetlenir. Dört iletişim rolünün tamamını içermeyen bir kayıt, e-posta adresi olmayan bir
+iletişim kişisi veya 0 yıllık bir süre `ArgumentException` fırlatır ve API'ye hiçbir şey ulaşmaz.
+
+**Ayarlar**
+
+```csharp
+await client.Domains.LockAsync("example.com");
+await client.Domains.UnlockAsync("example.com");
+await client.Domains.SetPrivacyProtectionAsync("example.com", enabled: true);
+await client.Domains.SetNameServersAsync("example.com", ["ns1.example.net", "ns2.example.net"]);
+await client.Domains.SetNameServersAsync("example.com", ["ns1.example.net"], DnssecMode.DisableDnssec);  // a signed domain
+var authCode = await client.Domains.UpdateAuthCodeAsync("example.com");
+
+await client.Domains.UpdateContactsAsync("example.com", DomainContact.ForAllRoles(contact));
+await client.Domains.SetContactHandlesAsync("example.com", [new ContactHandle(ContactType.Tech, "DNA-12345")]);
+```
+
+**URL yönlendirme, child nameserver'lar ve belgeler**
+
+```csharp
+await client.Domains.Forwarding.SetAsync("example.com", "https://www.example.net", ForwardType.Standard);
+var forwarding = await client.Domains.Forwarding.GetAsync("example.com");
+await client.Domains.Forwarding.DeleteAsync("example.com");
+
+// The IP version of each address is detected
+await client.Domains.ChildNameServers.AddAsync("example.com", "ns1.example.com", "192.0.2.10", "2001:db8::10");
+await client.Domains.ChildNameServers.UpdateAsync("example.com", "ns1.example.com", ["192.0.2.20"]);
+await client.Domains.ChildNameServers.DeleteAsync("example.com", "ns1.example.com");
+
+// Registry documents (mostly .tr)
+await client.Domains.Documents.UploadAsync("example.com.tr", [DocumentUpload.FromFile(DocumentType.IdentityCard, "id.pdf")]);
+await foreach (var document in client.Domains.Documents.ListAllAsync("example.com.tr"))
+{
+    Console.WriteLine($"{document.Name}: {document.Status}");
+}
+```
+
+<a id="contacts"></a>
+
+### İletişim bilgileri
+
+İletişim kişisi tanımlayıcıları (handle), yeniden kullanılabilir iletişim kayıtlarıdır. Bir kez oluşturun, birçok alan adında kullanın.
+
+```csharp
+var created = await client.Contacts.CreateAsync(contact);
+string handle = created.Handle!;                          // for example DNA-12345
+
+var details = await client.Contacts.GetAsync(handle);     // the contact and its verification state
+var result = await client.Contacts.UpdateAsync(handle, contact);
+Console.WriteLine($"{result.Stats?.SuccessCount} of {result.Stats?.TotalDomainCount} domains updated");
+
+var verifications = await client.Contacts.GetVerificationAsync(handle);
+await client.Contacts.ResendVerificationAsync(handle);
+```
+
+<a id="dns"></a>
+
+### DNS
+
+Platformun nameserver'larındaki alan adlarının bölge (zone) kayıtları. Alan adı bu nameserver'ları kullanmaya başlayınca
+kayıtlar herkese açık olarak çözümlenir; bunu `ApplyAsync` sağlar.
+
+```csharp
+var sets = await client.Dns.ListAsync("example.com");
+foreach (var set in sets)
+{
+    Console.WriteLine($"{set.Name} {set.Type} {set.Ttl} {string.Join(", ", set.Values)}");
+}
+
+await client.Dns.AddAsync("example.com", "www", RecordType.A, "192.0.2.10");
+await client.Dns.AddAsync("example.com", "@", "txt", "v=spf1 include:_spf.example.net ~all");   // "txt" becomes TXT
+await client.Dns.AddAsync("example.com", "@", RecordType.MX, ["10 mx1.example.net", "20 mx2.example.net"], ttl: 3600);
+await client.Dns.ReplaceAsync("example.com", "www", RecordType.A, ["192.0.2.20"], ttl: 300);
+await client.Dns.DeleteAsync("example.com", "www", RecordType.A, "192.0.2.20");
+
+var applied = await client.Dns.ApplyAsync("example.com");
+```
+
+SDK, API'nin reddedeceği durumları önceden denetler: apex'te CNAME, üç parçası eksik bir CAA değeri, 1–86400 dışında
+bir TTL. Bölge çağrıları, geçidin sınırı olan 1 saniye arayla yapılır.
+
+<a id="dnssec"></a>
+
+### DNSSEC
+
+```csharp
+var info = await client.Dnssec.GetAsync("example.com");   // Status, DsRecords, AllowedAlgorithms, ...
+
+var record = DsRecordData.Parse("12345 13 2 49FD46E6C4B45C55D4AC69CBD3CD34AC1AFE51DE");
+await client.Dnssec.AddAsync("example.com", record);
+await client.Dnssec.RemoveAsync("example.com", record);
+await client.Dnssec.DisableAsync("example.com");          // removes every DS record
+```
+
+<a id="ssl"></a>
+
+### SSL
+
+```csharp
+// 1. Buy (charges the balance). Product codes come from client.Products.ListSslProductsAsync().
+var order = await client.Ssl.PurchaseAsync("example.com", "PKG-CODE");
+
+// 2. A CSR and private key, if you do not have one
+var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com")
+{
+    Country = "TR", State = "Istanbul", Locality = "Istanbul", Organization = "Example Ltd", OrganizationUnit = "IT",
+});
+
+// 3. Configure: CSR, validation method and contact
+var approvers = await client.Ssl.GetApproverEmailsAsync("example.com");
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", csr.Csr!, certificateContact)
+{
+    ValidationMethod = ValidationMethod.Email,
+    ApproverEmail = approvers[0],
+    WebServerType = WebServerType.Apache,
+});
+
+// 4. Wait for issuance, then download
+var status = await client.Ssl.RefreshStatusAsync("example.com");
+if (status.IsIssued)
+{
+    var content = await client.Ssl.GetContentAsync("example.com");
+    File.WriteAllText("fullchain.pem", content.FullChain);
+}
+
+await client.Ssl.ReissueAsync(new ReissueCertificateRequest("example.com") { Csr = newCsr, PrivateKey = newKey });
+await client.Ssl.RevokeAsync("example.com");              // cannot be undone
+```
+
+<a id="hosting"></a>
+
+### Hosting
+
+```csharp
+var packages = await client.Hosting.ListPackagesAsync();
+var created = await client.Hosting.CreateAsync("example.com", "starter-linux");   // charges the balance
+var status = await client.Hosting.GetStatusAsync("example.com");                   // panel access once ready
+var hosting = await client.Hosting.GetAsync("example.com");
+var plans = await client.Hosting.ListPlansAsync();
+```
+
+<a id="orders-and-products"></a>
+
+### Siparişler ve ürünler
+
+```csharp
+var order = await client.Orders.GetAsync("ORDER-CODE");
+
+var com = await client.Products.GetTldAsync("com");
+Console.WriteLine($"{com?.GetRegistrationPrice(1)?.Price} {com?.GetRegistrationPrice(1)?.Currency}, DNSSEC: {com?.SupportsDnssec}");
+
+await foreach (var tld in client.Products.ListAllTldsAsync(new ListTldsRequest { Currency = "USD" }))
+{
+    Console.WriteLine(tld.Name);
+}
+
+var price = await client.Products.GetPriceAsync("com", OrderType.Renew, years: 1);
+var ssl = await client.Products.ListSslProductsAsync(new ListSslProductsRequest { IsWildcard = true });
+```
+
+<a id="requests-and-baserequest"></a>
+
+## İstekler ve `BaseRequest`
+
+Her işlem bir istek sınıfıdır; örneğin `RenewDomainRequest`, `ListDomainsRequest` veya `AddDnsRecordRequest`.
+Yukarıdaki istemci metotları bunları sizin yerinize oluşturur; isterseniz bunları kendiniz de oluşturup gönderebilirsiniz:
+
+```csharp
+var request = new RenewDomainRequest("example.com", period: 2);
+Console.WriteLine($"{request} is {request.Safety}");   // "POST domains/renew is Billable"
+
+DomainOperationResult result = await client.SendAsync(request);
+
+// The same, with the HTTP details: correlation ID, soft-quota state, attempts, duration
+var response = await client.SendWithResponseAsync(request);
+Console.WriteLine($"{response.CorrelationId} quota {response.Quota?.Used}/{response.Quota?.Limit}");
+```
+
+Tüm istekler üç temel sınıftan birinden türer:
+
+| Temel sınıf | Ne için |
+|---|---|
+| `BaseRequest` | Hiçbir şey döndürmeyen işlemler (kilitleme, kilit açma, DNS kaydı ekleme, ...). |
+| `BaseRequest<TResponse>` | Veri döndüren işlemler. |
+| `PagedRequest<TItem>` | Liste işlemleri. `SkipCount`, `MaxResultCount` ve `Sorting` ekler, `ListAllAsync` ile çalışır. |
+
+Bir istek, ne olduğunu birkaç override ile bildirir. POST ve PUT için istek nesnesinin kendisi JSON gövdesidir
+(camelCase, null değerler dışarıda bırakılır). Sorgu parametreleri `AddQueryParameters` içinde eklenir, göndermeden
+önceki denetimler `Validate` içine yazılır. SDK'nın henüz kapsamadığı bir uç noktayı çağırmak için kendi isteğinizi yazın:
+
+```csharp
+public sealed class GetDomainNotesRequest : BaseRequest<DomainNotes>
+{
+    public GetDomainNotesRequest(string domainName) => DomainName = domainName;
+
+    public string DomainName { get; }
+
+    public override HttpMethod Method => HttpMethod.Get;
+    public override string Path => "domains/notes";              // below /api/v1/
+    public override OperationSafety Safety => OperationSafety.Read;
+
+    protected override void AddQueryParameters(QueryParameters query) => query.Add("DomainName", DomainName);
+    protected override void Validate() => Require(DomainName, nameof(DomainName));
+}
+
+var notes = await client.SendAsync(new GetDomainNotesRequest("example.com"));
+```
+
+İsteğiniz, yerleşik isteklerin aldığı her şeyi alır: kimlik bilgileri, güvenlik sınıfına göre yeniden denemeler, hız
+ayarlama, salt-okunur mod ve hata yönetimi. API farklı bir gövde biçimi bekliyorsa `GetBody()` metodunu, bir yazma
+işlemi tekrarlanırken güvenliyse `IsIdempotent` özelliğini override edin.
+
+<a id="errors"></a>
+
+## Hatalar
+
+Başarısız her istek bir `DomainNameApiException` fırlatır. Geçersiz argümanlar, hiçbir şey gönderilmeden önce
+`ArgumentException` fırlatır.
+
+```csharp
+try
+{
+    await client.Domains.RenewAsync("example.com");
+}
+catch (DomainNameApiException e) when (e.Kind == ApiErrorKind.Validation)
+{
+    Console.WriteLine($"{e.Code}: {e.Message}");          // Dna.DomainService:Domain:10007: ...
+    foreach (var field in e.ValidationErrors)
+    {
+        Console.WriteLine($"  {field}");
+    }
+}
+catch (DomainNameApiException e) when (e.OutcomeUnknown)
+{
+    // A billable or changing request failed on the network: it may have reached the API.
+    // Check the state before sending it again.
+    var details = await client.Domains.GetAsync("example.com");
+}
+```
+
+| Özellik | Anlamı |
+|---|---|
+| `Kind` | Sabit bir sınıflandırma (aşağıdaki tablo). Mesaja göre değil, buna göre dallanın. |
+| `Code` | API'nin hata kodu (örneğin `Dna.DomainService:Domain:10007`) veya aşağıdaki SDK kodlarından biri. |
+| `Message` | Ne olduğu. Kalıp mesajların yerine API'nin ayrıntıları konur. |
+| `StatusCode` | HTTP durumu; yanıt gelmediyse null. |
+| `Details`, `ValidationErrors` | API'den gelen ek ayrıntılar ve alan düzeyindeki sorunlar. |
+| `CorrelationId` | Geçidin `X-Correlation-Id` değeri. Destekle iletişime geçerken bunu belirtin. |
+| `Hint` | Sonra ne yapılacağına dair kısa bir öneri. |
+| `IsRetryable` | Aynı isteği daha sonra tekrarlamanın başarılı olup olamayacağı. |
+| `OutcomeUnknown` | Bir şeyi değiştiren istek ağda başarısız oldu, bu yüzden çalışmış olabilir. |
+| `Operation`, `Safety` | Başarısız olan istek (`POST domains/renew`) ve onun güvenlik sınıfı. |
+| `RetryAfter`, `ResponseBody` | Geçidin `Retry-After` değeri ve ham yanıt. |
+
+| `Kind` | Ne zaman |
+|---|---|
+| `Authentication` | Yanlış veya eksik kimlik bilgileri ya da bu ortamda bilinmeyen veya askıya alınmış bir bayi (401, yönlendirme). |
+| `Forbidden` | Kimlik doğrulandı ama izin yok (403). |
+| `NotFound` | Alan adı, iletişim kişisi, sipariş veya başka bir kaynak yok (404). |
+| `Validation` | API girdiyi reddetti ya da bir iş kuralı başarısız oldu: hatalı alan, kilitli alan adı, yetersiz bakiye (400, 422). |
+| `Conflict` | Kaynağın durumu işleme izin vermiyor (409). |
+| `RateLimited` | Otomatik yeniden denemelerden sonra hâlâ hız sınırında (429). |
+| `Server` | Sunucu tarafı hata (5xx). Çoğu zaman geçicidir. |
+| `Network`, `Timeout` | Yanıt yok: DNS, TLS, proxy, bağlantı sıfırlanması veya `Timeout` içinde yanıt gelmemesi. |
+| `ReadOnly` | Salt-okunur mod tarafından engellendi; hiçbir şey gönderilmedi. |
+| `Unknown` | SDK'nın okuyamadığı bir yanıt dahil, geri kalan her şey. |
+
+SDK'nın kendisinin belirlediği kodlar:
+
+| Kod | Anlamı |
+|---|---|
+| `INVALID_RESELLER` | Geçit, askıya alma sayfasına yönlendirdi: reseller ID **bu ortamda** bilinmiyor, etkin değil veya askıya alınmış. |
+| `INVALID_API_KEY` | Anahtar bayiyle eşleşmiyor. Canlı ortam ve OTE anahtarları farklıdır. |
+| `MISSING_API_KEY`, `MISSING_RESELLER_ID`, `NO_CREDENTIALS` | Bir kimlik bilgisi boş. |
+| `SUBRESELLER_NOT_ALLOWED` | Alt bayi hesapları API'yi kullanamaz. Ana bayinin kimlik bilgilerini kullanın. |
+| `UNAUTHORIZED` | Diğer tüm 401 yanıtları. |
+| `RATE_LIMITED` | Yeniden denemelerden sonra 429. |
+| `NETWORK`, `TIMEOUT` | Yanıt gelmedi. |
+| `READ_ONLY` | Salt-okunur mod tarafından engellendi. |
+| `EMPTY_RESPONSE`, `INVALID_RESPONSE` | Başarılı bir yanıt boştu veya okunamadı. |
+| `HTTP_<status>` | API hata kodu göndermedi. |
+
+<a id="safety-retries-and-rate-limits"></a>
+
+## Güvenlik, yeniden denemeler ve hız sınırları
+
+Her isteğin bir güvenlik sınıfı vardır; `dna` CLI'nin kullandığıyla aynıdır:
+
+| `OperationSafety` | Anlamı | Örnekler |
+|---|---|---|
+| `Read` | API POST veya PUT kullansa bile yan etkisi yok | arama, ayrıntılar, listeler, yenileme ve transfer denetimleri, CSR üretimi |
+| `Write` | Geri alınabilen ücretsiz bir değişiklik | DNS kayıtları, kilit, gizlilik, nameserver'lar, iletişim bilgileri |
+| `Billable` | Bakiyenizden ücret alır | kayıt, yenileme, transfer, geri yükleme, SSL satın alma, hosting siparişi |
+| `Destructive` | Bir şeyi siler veya geri alması zordur | DNS kaydı silme, DNSSEC kaldırma, sertifika iptali |
+
+- **Salt-okunur mod** (`ReadOnly = true` veya `DNA_READ_ONLY=true`), `Read` olmayan her şeyi gönderilmeden önce engeller.
+  Keşif yaparken, raporlarda ve panolarda kullanın.
+- **Yeniden denemeler.** 429 yanıtları her zaman, `Retry-After` dikkate alınarak yeniden denenir. Bu, ücretli istekler
+  için bile güvenlidir, çünkü geçit bunları hiçbir şey çalışmadan önce reddeder. Ağ hataları, zaman aşımları ve
+  502/503/504 yanıtları yalnızca okumalarda (ve nameserver değiştirme gibi tekrarlanması güvenli yazmalarda)
+  yeniden denenir. Bir kayıt veya yenileme asla iki kez gönderilmez.
+- **Hız ayarlama.** Geçit, anahtar başına saniyede 5 isteğe, alan adı aramalarında saniyede 2 isteğe ve DNS bölge
+  çağrılarında saniyede 20 isteğe izin verir. İstemci, istekleri bu sınırların altında kalacak şekilde aralıklar
+  (bölge çağrıları 1 saniye arayla). Alan adı bilgisi ve TLD listesi hız sınırına tabi değildir.
+- **Yumuşak kota.** Aramalar ve bilgi sorguları 1 puan, diğer her şey 10 puan harcar. 200 puanın üzerinde geçit her
+  isteği 5 saniyeye kadar yavaşlatır; puanlar dakikada %20 azalır. `SendWithResponseAsync`, durumu `Quota` içinde gösterir.
+
+<a id="dependency-injection"></a>
+
+## Dependency injection
+
+`DomainNameApiClient`, tipli bir `HttpClient` olarak çalışır:
+
+```csharp
+builder.Services.AddSingleton(new DomainNameApiOptions
+{
+    ResellerId = builder.Configuration["DomainNameApi:ResellerId"]!,
+    ApiKey = builder.Configuration["DomainNameApi:ApiKey"]!,
+    Environment = ApiEnvironment.Ote,
+});
+builder.Services.AddHttpClient<DomainNameApiClient>();
+
+// Then inject it
+public sealed class RenewalService(DomainNameApiClient dna)
+{
+    public Task<DomainOperationResult> RenewAsync(string domain) => dna.Domains.RenewAsync(domain);
+}
+```
+
+SDK, kendi `HttpClient`'ında yönlendirmeleri izlemez. Factory ile üretilen bir istemci yönlendirmeleri izleyebilir;
+SDK yine de geçidin askıya alma sayfasını tanır ve `INVALID_RESELLER` bildirir.
+
+<a id="testing-your-code"></a>
+
+## Kodunuzu test etme
+
+SDK'yı kullanan kodu API'yi çağırmadan test etmek için, stub handler'lı bir `HttpClient` verin:
+
+```csharp
+sealed class StubHandler(string json) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+        Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+}
+
+var client = new DomainNameApiClient(
+    new HttpClient(new StubHandler("""{"resellerName":"Test","usdBalance":10}""")),
+    new DomainNameApiOptions { ResellerId = "test", ApiKey = "test", PaceRequests = false });
+
+var account = await client.Account.GetAsync();   // UsdBalance == 10
+```
+
+Gerçek API'ye karşı testler için, kendi anahtarıyla OTE'yi kullanın.
+
+<a id="project-layout"></a>
+
+## Proje yapısı
+
+```
+src/DomainNameApi/
+├── DomainNameApiClient.cs        The entry point: sub-clients, SendAsync, retries, pacing
+├── DomainNameApiOptions.cs       Settings and FromEnvironment()
+├── Core/                         BaseRequest, PagedRequest, QueryParameters, errors, responses, shared enums
+├── Internal/                     JSON settings, error parsing, the rate-limit pacer
+├── Accounts/   AccountClient     Balances and transactions
+├── Contacts/   ContactsClient    Contact handles
+├── Domains/    DomainsClient     Domains, plus Forwarding, ChildNameServers and Documents
+├── Dns/        DnsClient         Zone records
+├── Dnssec/     DnssecClient      DS records
+├── Ssl/        SslClient         Certificates
+├── Hosting/    HostingClient     Hosting packages and services
+├── Orders/     OrdersClient      Orders
+└── Products/   ProductsClient    TLDs, SSL products and prices
+```
+
+Her alan klasörü aynı biçimdedir: `XxxClient.cs`, işlem başına bir sınıf içeren bir `Requests/` klasörü ve yanıtları
+ile enum'ları içeren bir `Models/` klasörü. Bir alanın tüm tipleri tek bir namespace'i paylaşır, örneğin `DomainNameApi.Domains`.
+
+<a id="development"></a>
+
+## Geliştirme
 
 ```bash
+dotnet build
 dotnet test
 ```
 
-Yerelde .NET SDK yoksa testleri Docker içinde çalıştırın:
+Testler gerçek API'yi asla çağırmaz: sahte bir `HttpMessageHandler` kullanır. Windows'ta .NET 10 üzerinde ve
+.NET Framework 4.8 üzerinde çalışırlar; ikincisi .NET Standard 2.0 derlemesini sınar.
 
-```bash
-docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
-```
+`tests/DomainNameApi.Tests/testdata/openapi.json`, `dna` CLI'nin içine gömdüğü API dokümanıdır. `SpecCoverageTests`,
+içindeki her işlemin, CLI'nin güvenlik sınıfıyla birlikte tam olarak bir istek sınıfına sahip olduğunu denetler. API'ye
+yeni bir işlem eklendiğinde dokümanı güncelleyin; istek yazılana kadar test başarısız olur.
 
-| Test dosyası | Açıklama |
-|-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | php-dna'nın 134 uyumluluk senaryosunun (`testdata/conformance/`) tamamını yeniden oynatır, istekleri ve sonuçları karşılaştırır |
-| `tests/DomainNameApi.Tests/HttpLayerTests.cs` | Başlıklar, URL'ler, sorgu metinleri (query string), test modu, zaman aşımları, bölge çağrısı aralıkları |
-| `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | Yerel bir dinleyiciye karşı varsayılan `HttpClient` taşıma katmanı |
-| `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | Gateway hata eşlemesi ve doğrulama mesajları |
-| `tests/DomainNameApi.Tests/TelemetryTests.cs` | Telemetri içerikleri, kimlik bilgisi maskeleme, minimal mod |
-| `tests/DomainNameApi.Tests/UtilityTests.cs` | Kişi bilgisi doğrulama, telefon/ülke normalizasyonu, PHP uyumlu biçimlendirme |
+<a id="upgrading-from-1x"></a>
 
-<hr style="border: 4px solid #000; border-style: dashed;">
+## 1.x'ten yükseltme
 
-## Dönüş ve Hata Kodları ile Açıklamaları
+2.0 yeni bir SDK'dır. 1.x, PHP kütüphanesinin bir uyarlamasıydı ve tipsiz `JsonNode` zarfları döndürüyordu; 2.0'da tipli
+istekler ve modeller, async metotlar ve istisnalar vardır.
 
-| Kod  | Açıklama                                       | Detay                                                                                                                                                          |
-|------|------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1000 | Komut başarıyla tamamlandı                     | İşlem başarılı.                                                                                                                                                |
-| 1001 | Komut başarıyla tamamlandı; işlem beklemede    | İşlem başarılı. Ancak işlem şu anda tamamlanmak üzere kuyruğa alınmıştır.                                                                                      |
-| 2003 | Gerekli parametre eksik                        | Parametre eksik hatası. Örneğin kişi bilgilerinde telefon girilmemiş olması.                                                                                   |
-| 2105 | Nesne yenilemeye uygun değil                   | Alan adının durumu yenilemeye uygun değil, güncelleme işlemlerine kilitlenmiş. Durum "clientupdateprohibited" olmamalıdır. Başka durum koşullarından kaynaklanabilir. |
-| 2200 | Kimlik doğrulama hatası                        | Yetkilendirme hatası; güvenlik kodu hatalı veya alan adı başka bir kayıt firmasında kayıtlı.                                                                   |
-| 2302 | Nesne zaten mevcut                             | Alan adı veya nameserver bilgisi veritabanında zaten mevcut. Kayıt yapılamaz.                                                                                  |
-| 2303 | Nesne mevcut değil                             | Alan adı veya nameserver bilgisi veritabanında mevcut değil. Yeni kayıt gereklidir.                                                                            |
-| 2304 | Nesne durumu işleme izin vermiyor              | Alan adının durumu güncellemeye uygun değil, güncelleme işlemlerine kilitlenmiş. Durum "clientupdateprohibited" olmamalıdır. Başka durum koşullarından kaynaklanabilir. |
+| 1.x | 2.0 |
+|---|---|
+| `new DomainNameApiClient(id, key, testMode: true)` | `new DomainNameApiClient(id, key, ApiEnvironment.Ote)` |
+| `dna.CheckAvailability(...)` | `client.Domains.SearchAsync(...)` / `BulkSearchAsync(...)` |
+| `dna.GetDetails(domain)` | `client.Domains.GetAsync(domain)` |
+| `dna.GetList()` | `client.Domains.ListAsync()` / `ListAllAsync()` |
+| `dna.RegisterWithContactInfo(...)` | `client.Domains.RegisterAsync(...)` |
+| `dna.Renew(domain, period)` | `client.Domains.RenewAsync(domain, years)` |
+| `dna.ModifyNameServer(...)` | `client.Domains.SetNameServersAsync(...)` |
+| `dna.AddChildNameServer(...)` | `client.Domains.ChildNameServers.AddAsync(...)` |
+| `dna.GetResourceRecords(domain)` | `client.Dns.ListAsync(domain)` |
+| `dna.AddResourceRecord(...)` | `client.Dns.AddAsync(...)` |
+| `dna.SetForwarding(...)` | `client.Domains.Forwarding.SetAsync(...)` |
+| `dna.GetCurrentBalance()` | `client.Account.GetAsync()` |
+| `result["result"] == "ERROR"` | `catch (DomainNameApiException e)` |
 
-| KOD  | DETAY                                                                                                                                |
-|------|--------------------------------------------------------------------------------------------------------------------------------------|
-| 101  | ({0}) için ayrıntılı sistem hatası!                                                                                                  |
-| 102  | ({0}) için ayrıntılı çoklu hata!                                                                                                     |
-| 103  | ({0}) için ayrıntılı bilinmeyen hata!                                                                                                |
-| 200  | API komutu bulunamadı ({0})!                                                                                                         |
-| 210  | API servisi bulunamadı ({0})!                                                                                                        |
-| 211  | API servis sağlayıcısı ayarlanmamış!                                                                                                 |
-| 300  | Bayi bulunamadı!                                                                                                                     |
-| 301  | Mevcut IP adresinizin erişim yetkisi yok. Lütfen yetkili bir IP adresinden bağlandığınızdan emin olun ve tekrar deneyin              |
-| 310  | TLD desteklenmiyor!                                                                                                                  |
-| 320  | API bulunamadı!                                                                                                                      |
-| 321  | Para birimi desteklenmiyor!                                                                                                          |
-| 330  | Gerekli parametre(ler) ayarlanmamış ({0}).                                                                                           |
-| –    | Tüm kişi (contact) nesnelerini eksiksiz gönderdiğinizden emin olun                                                                   |
-| 340  | Fiyat tanımı bulunamadı ({0}[{1}]-{2}{3}).                                                                                           |
-| 350  | Yetersiz bayi bakiyesi. (Bayi Id : {0} - Mevcut Bakiye : {1} {2}).                                                                   |
-| 350  | Muhasebe para birimi eşleşmiyor veya bakiye yetersiz.                                                                                |
-| 360  | ({0}) alanı için geçersiz API isteği.                                                                                                |
-| 360  | API kotası aşıldı!                                                                                                                   |
-| 361  | İstek sınırlama (throttling) hatası!                                                                                                 |
-| 362  | Premium alan adı şu anda kayıt için uygun değil.                                                                                     |
-| 363  | Alan adı otomatik yenileme döneminde olduğu için işlem iptal edildi                                                                  |
-| 364  | Bu alan adı, kayıt otoritesindeki (registry) bir sorun nedeniyle şu anda işlem için uygun değil                                      |
+1.x, hata raporlarını Sentry'ye gönderiyordu. 2.0, API dışında hiçbir yere hiçbir şey göndermez.
 
-| KOD  | DETAY                                                                                       |
-|------|---------------------------------------------------------------------------------------------|
-| 400  | Geçersiz kişi bilgisi ({0}).                                                                |
-| 401  | Kişi bilgisi senkronize edilemiyor.                                                         |
-| 402  | Kayıt otoritesinden kişi bilgilerine erişilemiyor.                                          |
-| 403  | SİSTEMDE EKSİK BİLGİ VAR. VARSAYILAN BİLGİLERİNİZİ GİRİN VEYA DESTEK EKİBİYLE İLETİŞİME GEÇİN. |
-| 404  | ALAN ADI KİŞİ BİLGİLERİ GÜNCELLENEMİYOR. KAYIT OTORİTESİNDEN İZİN GEREKLİ.                  |
-| 410  | Kişi bulunamadı.                                                                            |
-| 410  | Kişi bulunamadı ({0}).                                                                      |
-| 420  | {0} kişisi için geçersiz API komutu.                                                        |
-| 430  | Kişi API'si bulunamadı.                                                                     |
-| 440  | Kişi bilgisi senkronize edilmemiş.                                                          |
-| 450  | Çok fazla alan adı kişi kaydı!                                                              |
-| 451  | Kişi bilgisi güncellemesine devam edilemedi.                                                |
+## Bağlantılar
 
-| KOD  | DETAY                                                                                                                                |
-|------|--------------------------------------------------------------------------------------------------------------------------------------|
-| 500  | Geçersiz alan adı kimliği.                                                                                                           |
-| 500  | Geçersiz alan adı kimliği ({0}).                                                                                                     |
-| 501  | Alan adı senkronize edilemedi ({0})                                                                                                  |
-| 502  | Dahili transfer başarısız oldu                                                                                                       |
-| 503  | Alan adı kaydı yapılamıyor.                                                                                                          |
-| 504  | Alan adı bilgileri eşleşmiyor. Önceki: {0}                                                                                           |
-| 505  | IP adresini girin.                                                                                                                   |
-| 506  | Alan adı transferi başlatıldı ancak kişi bilgileri okunamadı.                                                                        |
-| 507  | Yetkilendirme hatası.                                                                                                                |
-| 510  | Alan adı bulunamadı.                                                                                                                 |
-| 511  | Süresi dolmuş alan adları bulunamaz.                                                                                                 |
-| 512  | Alan adı yenilenemez.                                                                                                                |
-| 513  | Alan adı güncellenebilir durumda değil. Güncellenebilmesi için aktif olmalıdır                                                       |
-| 514  | Geri alma (redemption) dönemi bekleniyor.                                                                                            |
-| 520  | "{0}" alan adı için geçersiz API komutu.                                                                                             |
-| 530  | Geçersiz alan adı süresi. Süre {0} ile {1} yıl arasında olmalıdır. İstenen süre {2} yıl.                                             |
-| 540  | Alan adı, bugünden itibaren {0} yıldan daha ileriye uzatılamaz.                                                                      |
-| 550  | Geçersiz alan adı. Alan adı {0} ile {1} karakter uzunluğunda olmalıdır. İstenen alan adı {2} karakter.                               |
-| 560  | Geçersiz nameserver sayısı. Alan adının {0} ile {1} arasında nameserver'ı olmalıdır. İstenen nameserver sayısı {2}.                  |
-| 561  | Gelen istekte nameserver bilgisi bulunamadı                                                                                          |
-| 570  | "{0}" TLD'si için IDN desteklenmiyor.                                                                                                |
-| 571  | Süre geçersiz.                                                                                                                       |
-| 572  | Komut geçersiz.                                                                                                                      |
-| 573  | Alan adları bulunamadı.                                                                                                              |
-| 574  | TLD adları bulunamadı.                                                                                                               |
-| 575  | Alan adı güncellenebilir durumda değil. Nameserver'ların güncellenebilmesi için aktif olmalıdır                                      |
-| 576  | Alan adı, bitiş tarihinden önceki son 1 ay içinde yenilenebilir                                                                      |
-| 580  | "{0}" TLD'si için transfer desteklenmiyor.                                                                                           |
-| 581  | Child nameserver bulunamadı                                                                                                          |
-| 582  | Transfer başka bir bayi tarafından başlatıldı.                                                                                       |
-| 583  | Transfer başlatılamadı. Lütfen destek ekibiyle iletişime geçin.                                                                      |
-| 584  | Nesne durumu işleme izin vermiyor                                                                                                    |
-| 590  | Bu transfer için auth kodu gereklidir.                                                                                               |
-| 591  | Auth kodu geçerli değil.                                                                                                             |
-| 592  | Alan adında transfer kilidi bulunuyor.                                                                                               |
-| 593  | Alan adı transfer edilemez; Durum Bilgisi ve Transfer Kilidi gerekli kriterlere uymalıdır. (Durum Bilgisi: #ok)                      |
-| 594  | Alan adının nameserver adresi çözümlenemedi ({0})                                                                                    |
-| 595  | Kişi bilgileri okunamıyor (whois.registrar.tld). Lütfen gizlilik korumasının açık olduğundan emin olun                               |
-| 596  | Kişi bilgileri doğrulanamadı                                                                                                         |
-| 597  | TLD bulunamadı                                                                                                                       |
-| 598  | Bilinmeyen bir hata oluştu                                                                                                           |
-| 599  | Alan adı yönlendirmesi bulunamadı                                                                                                    |
+- [`dna` CLI ve MCP sunucusu](https://github.com/domainreseller/cli): aynı API, terminalden ve yapay zeka ajanlarından.
+- [API dokümantasyonu](https://www.domainnameapi.com/docs/)
+- [Değişiklik günlüğü](CHANGELOG.md)
 
 ## Lisans
 
-Apache License 2.0 — bkz. [LICENSE](LICENSE).
+Apache License 2.0. Bkz. [LICENSE](LICENSE).

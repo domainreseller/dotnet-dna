@@ -2,28 +2,29 @@
 
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
-    <LangVersion>latest</LangVersion>
-    <Nullable>disable</Nullable>
     <RootNamespace>DomainNameApi</RootNamespace>
     <AssemblyName>DomainNameApi</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
 
     <PackageId>DomainNameApi</PackageId>
-    <Version>1.0.1</Version>
+    <Version>2.0.0</Version>
     <Authors>DomainNameAPI</Authors>
     <Company>DomainNameAPI</Company>
-    <Description>Official .NET client for the DomainNameAPI domain reseller REST API: registration, renewal, transfers, contacts, nameservers, DNS zones and URL forwarding.</Description>
-    <PackageTags>domain;registrar;reseller;dns;domainnameapi;rest</PackageTags>
+    <Description>Official .NET SDK for the DomainNameAPI reseller REST API: typed clients and models for domains, contacts, DNS, DNSSEC, SSL certificates, hosting, orders, products and your account. Async, retries and rate-limit pacing built in.</Description>
+    <PackageTags>domain;registrar;reseller;dns;dnssec;ssl;hosting;domainnameapi;rest;sdk</PackageTags>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/domainreseller/dotnet-dna</PackageProjectUrl>
     <RepositoryUrl>https://github.com/domainreseller/dotnet-dna</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>https://github.com/domainreseller/dotnet-dna/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
     <PackageReference Include="System.Text.Json" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.15" />
   </ItemGroup>
 
   <ItemGroup>
