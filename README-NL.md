@@ -26,7 +26,7 @@ dotnet-dna is een getrouwe port van [php-dna](https://github.com/domainreseller/
 
 ### Minimale vereisten
 
-- .NET 8 of hoger, **of** elke runtime die .NET Standard 2.0 ondersteunt (.NET Framework 4.6.2+, .NET Core 2.0+, Mono, Xamarin, Unity).
+- .NET 10 of hoger, **of** elke runtime die .NET Standard 2.0 ondersteunt (.NET Framework 4.6.2+, .NET Core 2.0+, Mono, Xamarin, Unity).
 - Geen afhankelijkheden van derden. De bibliotheek gebruikt `HttpClient` en `System.Text.Json` (onder .NET Standard 2.0 wordt het pakket `System.Text.Json` automatisch meegenomen).
 
 ### Installatie
@@ -949,7 +949,7 @@ dotnet test
 Zonder lokale .NET SDK voert u ze uit in Docker:
 
 ```bash
-docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet test
+docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
 ```
 
 | Testbestand | Beschrijving |

@@ -26,7 +26,7 @@
 
 ### الحد الأدنى من المتطلبات
 
-- ‏.NET 8 أو أحدث، **أو** أي بيئة تشغيل تدعم .NET Standard 2.0 ‏(.NET Framework 4.6.2+‎، .NET Core 2.0+‎، Mono، Xamarin، Unity).
+- ‏.NET 10 أو أحدث، **أو** أي بيئة تشغيل تدعم .NET Standard 2.0 ‏(.NET Framework 4.6.2+‎، .NET Core 2.0+‎، Mono، Xamarin، Unity).
 - لا توجد اعتماديات من أطراف ثالثة. تستخدم المكتبة `HttpClient` و `System.Text.Json` (على .NET Standard 2.0 تُجلب حزمة `System.Text.Json` تلقائيًا).
 
 ### التثبيت
@@ -949,7 +949,7 @@ dotnet test
 في حال عدم توفر .NET SDK محليًا، شغّلها داخل Docker:
 
 ```bash
-docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet test
+docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
 ```
 
 | ملف الاختبار | الوصف |

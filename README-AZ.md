@@ -26,7 +26,7 @@ dotnet-dna [php-dna](https://github.com/domainreseller/php-dna) kitabxanasının
 
 ### Minimum Tələblər
 
-- .NET 8 və ya daha yeni versiya, **yaxud** .NET Standard 2.0-ı dəstəkləyən istənilən icra mühiti (.NET Framework 4.6.2+, .NET Core 2.0+, Mono, Xamarin, Unity).
+- .NET 10 və ya daha yeni versiya, **yaxud** .NET Standard 2.0-ı dəstəkləyən istənilən icra mühiti (.NET Framework 4.6.2+, .NET Core 2.0+, Mono, Xamarin, Unity).
 - Üçüncü tərəf asılılıqları yoxdur. Kitabxana `HttpClient` və `System.Text.Json` istifadə edir (.NET Standard 2.0-da `System.Text.Json` paketi avtomatik əlavə olunur).
 
 ### Quraşdırma
@@ -949,7 +949,7 @@ dotnet test
 Lokal .NET SDK yoxdursa, testləri Docker-də işə salın:
 
 ```bash
-docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet test
+docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
 ```
 
 | Test faylı | Açıqlama |

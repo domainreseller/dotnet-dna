@@ -26,7 +26,7 @@ dotnet-dna ist eine originalgetreue Portierung von [php-dna](https://github.com/
 
 ### Mindestanforderungen
 
-- .NET 8 oder neuer, **oder** jede Laufzeitumgebung, die .NET Standard 2.0 unterstützt (.NET Framework 4.6.2+, .NET Core 2.0+, Mono, Xamarin, Unity).
+- .NET 10 oder neuer, **oder** jede Laufzeitumgebung, die .NET Standard 2.0 unterstützt (.NET Framework 4.6.2+, .NET Core 2.0+, Mono, Xamarin, Unity).
 - Keine Abhängigkeiten von Drittanbietern. Die Bibliothek verwendet `HttpClient` und `System.Text.Json` (unter .NET Standard 2.0 wird das Paket `System.Text.Json` automatisch eingebunden).
 
 ### Installation
@@ -949,7 +949,7 @@ dotnet test
 Ohne lokales .NET SDK führen Sie sie in Docker aus:
 
 ```bash
-docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet test
+docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
 ```
 
 | Testdatei | Beschreibung |
