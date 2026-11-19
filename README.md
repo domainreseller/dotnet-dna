@@ -10,28 +10,59 @@
   <a href="README-IT.md"> | IT <img style="padding-top: 8px" src="https://raw.githubusercontent.com/yammadev/flag-icons/master/png/IT.png" alt="IT" height="20" /></a>
 </div>
 
-# DomainNameAPI .NET Library (dotnet-dna)
+# DomainNameAPI .NET SDK (dotnet-dna)
 
-The official .NET client for the DomainNameAPI reseller REST API: domain search, registration, renewal, transfers, contacts, nameservers, child nameservers, DNS zones and URL forwarding.
+<p>
+  <a href="https://github.com/domainreseller/dotnet-dna/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/domainreseller/dotnet-dna/ci.yml?branch=main&label=CI&style=flat-square" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-0B8DB5?style=flat-square" alt="Apache-2.0"></a>
+</p>
 
-dotnet-dna is a faithful port of [php-dna](https://github.com/domainreseller/php-dna): the same methods, the same requests on the wire and the same return values. It is checked against php-dna's conformance fixtures (134 scenarios), so code written against the PHP library translates one to one.
+The official .NET SDK for the [Domain Name API](https://www.domainnameapi.com) reseller platform. It covers all
+64 operations of the REST API with typed clients and models: domains, contacts, DNS, DNSSEC, SSL certificates,
+hosting, orders, products and your account.
 
-## 📦 Download — always use Releases!
+```csharp
+using var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Ote);
 
-⬇️ **Get the latest tested version here: https://github.com/domainreseller/dotnet-dna/releases/latest**
+var search = await client.Domains.SearchAsync("example.com");
+if (search.Info?.IsAvailable == true)
+{
+    await client.Domains.RegisterAsync("example.com", contact, ["tr.apiname.com", "eu.apiname.com"]);
+}
+```
 
-> ⚠️ Do **not** use the green **Code → Download ZIP** button — that downloads the raw development branch. Release packages are versioned, tested and production-ready.
+- **Typed everything.** Every operation is a request class and every answer a model with IntelliSense documentation. No dictionaries, no JSON parsing.
+- **Your own requests.** Every request derives from `BaseRequest`. Subclass it for an endpoint the SDK does not cover yet.
+- **Safe with money.** Every request declares whether it reads, writes, charges your balance or deletes something. Billable requests are never retried, and a read-only mode blocks every change.
+- **Built-in resilience.** Rate limits are respected automatically, 429 answers are retried, and network errors are retried for reads.
+- **Clear errors.** One exception type with a stable kind, the API's error code, field-level validation errors, the correlation ID and a hint.
+- **Modern .NET.** Async with cancellation, automatic paging with `IAsyncEnumerable`, `IHttpClientFactory` support, nullable annotations.
+- **Runs everywhere.** .NET 10, and any runtime that supports .NET Standard 2.0 (.NET Framework 4.6.2+, .NET 8, Mono, Unity).
 
-## Installation and Integration Guide
+It is the .NET counterpart of [`dna`, the Domain Name API CLI](https://github.com/domainreseller/cli): the same API
+document, the same safety classes, retry rules and error codes.
 
-### Minimum Requirements
+## Contents
 
-- .NET 10 or later, **or** any runtime that supports .NET Standard 2.0 (.NET Framework 4.6.2+, .NET Core 2.0+, Mono, Xamarin, Unity).
-- No third-party dependencies. The library uses `HttpClient` and `System.Text.Json` (on .NET Standard 2.0 the `System.Text.Json` package is pulled in automatically).
+- [Install](#install)
+- [Credentials](#credentials)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Usage](#usage): [account](#account) · [domains](#domains) · [contacts](#contacts) · [DNS](#dns) · [DNSSEC](#dnssec) · [SSL](#ssl) · [hosting](#hosting) · [orders and products](#orders-and-products)
+- [Requests and `BaseRequest`](#requests-and-baserequest)
+- [Errors](#errors)
+- [Safety, retries and rate limits](#safety-retries-and-rate-limits)
+- [Dependency injection](#dependency-injection)
+- [Testing your code](#testing-your-code)
+- [Project layout](#project-layout)
+- [Development](#development)
+- [Upgrading from 1.x](#upgrading-from-1x)
 
-### Installation
+## Install
 
-**A) NuGet package** — the package id is `DomainNameApi`. Each release ships the `.nupkg` file; once the package is listed on NuGet.org you can also install it directly:
+> [!IMPORTANT]
+> **Always use the [latest release](https://github.com/domainreseller/dotnet-dna/releases/latest).** Release packages are versioned and tested.
+> The green **Code → Download ZIP** button downloads the development branch instead.
 
 ```bash
 dotnet add package DomainNameApi
@@ -43,1024 +74,601 @@ To install a downloaded `.nupkg`, put it in a folder and use that folder as a pa
 dotnet add package DomainNameApi --source ./packages
 ```
 
-**B) Project reference** — download the release source and reference the project:
+Or reference the project from a release's source:
 
 ```bash
 dotnet add reference path/to/dotnet-dna/src/DomainNameApi/DomainNameApi.csproj
 ```
 
-## 🔑 API Credentials — Reseller ID & API Key
+**Requirements:** .NET 10 or later, or any runtime that supports .NET Standard 2.0. There are no third-party
+dependencies. On .NET Standard 2.0 the package pulls in Microsoft's `System.Text.Json` and
+`Microsoft.Bcl.AsyncInterfaces`, which are built into .NET.
 
-The library talks to the DomainNameAPI REST API and needs exactly two credentials, passed to the constructor:
+## Credentials
 
-| Parameter | Value |
-|---|---|
-| First | Reseller ID — UUID like `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
-| Second | API Key |
+The API authenticates every request with two values, which the SDK sends for you:
 
-> 💡 Find your **Reseller ID** and **API Key** in your DomainNameAPI panel under **API Settings**.
-> ⚠️ These are **API credentials** — your panel login details will **not** work here.
-
-```csharp
-using DomainNameApi;
-
-var resellerId = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-var apiKey     = "your-api-key";
-
-// Live environment
-var dna = new DomainNameApiClient(resellerId, apiKey);
-
-// Test (OTE) environment
-var dna = new DomainNameApiClient(resellerId, apiKey, true);
-```
-
-Leading and trailing whitespace in both credentials is removed. The test-mode flag can also be passed as text, the way configuration files and panels store it: `"true"`, `"1"`, `"on"` and `"yes"` (any case) select the test environment, anything else selects live.
-
-```csharp
-var dna = new DomainNameApiClient(resellerId, apiKey, Environment.GetEnvironmentVariable("DNA_TEST_MODE"));
-```
-
-## 🚀 Quick Start
-
-```csharp
-using System;
-using DomainNameApi;
-
-using var dna = new DomainNameApiClient("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "your-api-key");
-
-var result = dna.GetDetails("example.com");
-
-if ((string)result["result"] == "OK")
-{
-    Console.WriteLine("Status:  " + (string)result["data"]["Status"]);
-    Console.WriteLine("Expires: " + (string)result["data"]["Dates"]["Expiration"]);
-}
-else
-{
-    Console.WriteLine("Error " + (string)result["error"]["Code"] + ": " + (string)result["error"]["Message"]);
-}
-```
-
-### Return values
-
-Every method returns the same structure php-dna returns, as a `System.Text.Json.Nodes.JsonNode` (usually a `JsonObject`). Read values with casts or `GetValue<T>()`, or print the whole result with `ToJsonString()`:
-
-```csharp
-var details = dna.GetDetails("example.com");
-string status = (string)details["data"]["Status"];          // "Active"
-int    days   = (int)details["data"]["Dates"]["RemainingDays"];
-bool   locked = (string)details["data"]["LockStatus"] == "true";   // flags are the strings "true"/"false"
-Console.WriteLine(details.ToJsonString());
-```
-
-Key names, string flags (`"true"`/`"false"`) and formatted money strings (`"11.9900"`) are exactly as in php-dna. Most methods use the `result` = `OK`/`ERROR` envelope; `GetCurrentBalance` uses the legacy `OperationResult` envelope and `CheckAvailability` returns a bare list on success.
-
-Inputs such as contacts, TR attributes and list filters are `IDictionary<string, object>` with php-dna's keys (`FirstName`, `EMail`, `AddressLine1`, `PhoneCountryCode`, `TRABISCITIZENID`, `PageSize`, ...). Nameserver lists may be a list (`string[]`, `List<string>`) or a dictionary (the values are used).
-
-### Usage
-
-All examples below can also be run from the [examples](examples) folder (see [Examples](#examples)).
-
-#### Domain Registration
-
-Note: Additional parameters are required for .tr domains. The `additionalAttributes` parameter is used for domain names that require extra information like .tr.
-
-```csharp
-var contact = new Dictionary<string, object>
-{
-    ["FirstName"]        = "John",
-    ["LastName"]         = "Doe",
-    ["Company"]          = "Example Corp",
-    ["EMail"]            = "john.doe@example.com",
-    ["AddressLine1"]     = "123 Lorem Street",
-    ["AddressLine2"]     = "Suite 456",
-    ["AddressLine3"]     = "",
-    ["City"]             = "Springfield",
-    ["Country"]          = "US",
-    ["Fax"]              = "1234567890",
-    ["FaxCountryCode"]   = "1",
-    ["Phone"]            = "9876543210",
-    ["PhoneCountryCode"] = 1,
-    ["Type"]             = "Contact",
-    ["ZipCode"]          = "12345",
-    ["State"]            = "IL",
-};
-
-var result = dna.RegisterWithContactInfo(
-    "example.com",
-    1,
-    new Dictionary<string, object>
-    {
-        ["Administrative"] = contact,
-        ["Billing"]        = contact,
-        ["Technical"]      = contact,
-        ["Registrant"]     = contact,
-    },
-    new[] { "ns1.example.com", "ns2.example.com" },
-    eppLock: true,
-    privacyLock: false,
-    // Additional attributes are only required for .tr domains
-    additionalAttributes: new Dictionary<string, object>
-    {
-        ["TRABISDOMAINCATEGORY"] = 1,
-        ["TRABISCITIZIENID"]     = "12345678901",
-        ["TRABISNAMESURNAME"]    = "John Doe",
-        ["TRABISCOUNTRYID"]      = "840",
-        ["TRABISCITYID"]         = "17",
-    });
-```
-
-Contacts are completed before they are sent: missing fields get placeholder values, digits and punctuation are removed from names, a missing or blank state falls back to the city, country names become ISO codes and phone numbers are split into number and country code — a number written with its own `+` or `00` country code keeps that code (see `ValidateContact`). When no nameserver (or only empty ones) is given, `ns1.domainnameapi.com` and `ns2.domainnameapi.com` are used. For .tr domains the TRABIS attributes are reduced to what the gateway accepts (`TRABISDOMAINCATEGORY` = `Owner`/`Corporate`, `TRABISCITIZENID`, `TRABISTAXOFFICE`, `TRABISTAXNUMBER`); the legacy key `TRABISCITIZIENID` and the numeric category are converted automatically.
-
-<details>
-<summary>Sample Output for Domain Registration</summary>
-
-```json
-{
-  "data": {
-    "ID": 123456,
-    "Status": "Active",
-    "DomainName": "example.com",
-    "AuthCode": "Xy9#mK2$pL5@vN8",
-    "LockStatus": "true",
-    "PrivacyProtectionStatus": "false",
-    "IsChildNameServer": "false",
-    "Contacts": {
-      "Billing": { "ID": 987654 },
-      "Technical": { "ID": 987654 },
-      "Administrative": { "ID": 987654 },
-      "Registrant": { "ID": 987654 }
-    },
-    "Dates": { "Start": "2024-03-15T10:00:00", "Expiration": "2025-03-15T10:00:00", "RemainingDays": 365 },
-    "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-    "Additional": [],
-    "ChildNameServers": []
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-If the gateway refuses the order (it answers `"success": false`), the method returns an error envelope with `Code` = `REGISTER_DOMAIN` and the gateway's message, so a refused registration is never reported as done. `Renew` (`RENEW_DOMAIN`) and `Transfer` (`TRANSFER_DOMAIN`) behave the same way.
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domain Renewal
-
-```csharp
-var result = dna.Renew("example.com", 1);
-```
-
-<details>
-<summary>Sample Output for Domain Renewal</summary>
-
-```json
-{ "result": "OK", "data": { "ExpirationDate": "2025-03-15T10:00:00" } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domain Transfer
-
-```csharp
-var result = dna.Transfer("example.com", "Xy9#mK2$", 3);
-```
-
-> ℹ️ A transfer never sends contacts: the request always carries an empty contact list and the registrar takes the contacts over itself. `Transfer` therefore has no contacts parameter; update the contacts with `SaveContacts` after the transfer has completed if needed.
-
-<details>
-<summary>Sample Output for Domain Transfer</summary>
-
-```json
-{
-  "data": {
-    "ID": 0, "Status": "Active", "DomainName": "", "AuthCode": "",
-    "LockStatus": "false", "PrivacyProtectionStatus": "false", "IsChildNameServer": "false",
-    "Contacts": { "Billing": { "ID": 0 }, "Technical": { "ID": 0 }, "Administrative": { "ID": 0 }, "Registrant": { "ID": 0 } },
-    "Dates": { "Start": "", "Expiration": "2027-11-09T12:00:00", "RemainingDays": 365 },
-    "NameServers": [], "Additional": [], "ChildNameServers": []
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Cancel, Approve or Reject a Transfer
-
-```csharp
-dna.CancelTransfer("example.com");   // pending incoming transfer
-dna.ApproveTransfer("example.com");  // pending outgoing transfer
-dna.RejectTransfer("example.com");   // pending outgoing transfer
-```
-
-<details>
-<summary>Sample Output for Cancel Transfer</summary>
-
-```json
-{ "result": "OK", "data": { "DomainName": "example.com", "Status": "Cancelled" } }
-```
-
-`ApproveTransfer` and `RejectTransfer` answer the same way with `Approved` / `Rejected`.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Transfer Check
-
-```csharp
-var result = dna.CheckTransfer("example.com", "Ab1!xyZ9");
-```
-
-`result` is `OK` only when the registry reports the domain as transferable; otherwise it is `ERROR` with `Code` = `TRANSFER_NOT_AVAILABLE` and the details are still under `data`.
-
-<details>
-<summary>Sample Output for Transfer Check</summary>
-
-```json
-{
-  "result": "OK",
-  "data": {
-    "TransferAvailabilityStatus": true,
-    "AuthCodeIsRequired": true,
-    "AuthCodeIsValid": true,
-    "UserTransferRequired": false,
-    "TransferLock": false,
-    "Message": "Domain can be transferred",
-    "MessageKey": "TransferAvailable",
-    "Additional": []
-  }
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domain List
-
-```csharp
-var result = dna.GetList(new Dictionary<string, object>
-{
-    ["OrderColumn"]    = "Id",
-    ["OrderDirection"] = "ASC",
-    ["PageNumber"]     = 0,
-    ["PageSize"]       = 1000,
-});
-```
-
-`PageNumber` is zero-based. The gateway's own filter names (`MaxResultCount`, `SkipCount`, `Sorting`, `DomainName`, ...) can be passed as well.
-
-<details>
-<summary>Sample Output for Domain List</summary>
-
-```json
-{
-  "data": {
-    "Domains": [
-      {
-        "ID": 564346,
-        "Status": "Active",
-        "DomainName": "example.com",
-        "AuthCode": "",
-        "LockStatus": "false",
-        "PrivacyProtectionStatus": "false",
-        "IsChildNameServer": "false",
-        "Contacts": { "Billing": { "ID": "" }, "Technical": { "ID": "" }, "Administrative": { "ID": "" }, "Registrant": { "ID": "" } },
-        "Dates": { "Start": "2024-03-15T10:00:00", "Expiration": "2025-03-15T10:00:00", "RemainingDays": 365 },
-        "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-        "Additional": [],
-        "ChildNameServers": []
-      }
-    ]
-  },
-  "result": "OK",
-  "TotalCount": 1
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### TLD List
-
-```csharp
-var result = dna.GetTldList(100);
-```
-
-<details>
-<summary>Sample Output for TLD List</summary>
-
-```json
-{
-  "data": [
-    {
-      "id": 1,
-      "status": "Active",
-      "maxchar": 63,
-      "maxperiod": 10,
-      "minchar": 1,
-      "minperiod": 1,
-      "tld": "com",
-      "pricing": {
-        "registration": { "1": "10.8100" },
-        "renew": { "1": "11.0100" },
-        "transfer": { "1": "10.6100" },
-        "restore": { "1": "99.9000" }
-      },
-      "currencies": { "registration": "USD", "renew": "USD", "transfer": "USD", "restore": "USD" }
-    }
-  ],
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domain Availability Check
-
-```csharp
-var result = dna.CheckAvailability(new[] { "hello", "world123x0" }, new[] { "com", "net" }, 1, "create");
-```
-
-<details>
-<summary>Sample Output for Domain Availability Check</summary>
-
-```json
-[
-  {
-    "TLD": "com", "DomainName": "hello", "Status": "notavailable", "Command": "create", "Period": 1,
-    "IsFee": false, "Price": "10.8100", "Currency": "USD", "Reason": "Domain exists"
-  },
-  {
-    "TLD": "com", "DomainName": "world123x0", "Status": "available", "Command": "create", "Period": 1,
-    "IsFee": false, "Price": "10.8100", "Currency": "USD", "Reason": null
-  }
-]
-```
-
-On failure the method returns the usual error envelope instead of a list, so check `result is JsonArray` first.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Domain Details
-
-```csharp
-var result = dna.GetDetails("example.com");
-var synced = dna.SyncFromRegistry("example.com"); // same envelope
-```
-
-<details>
-<summary>Sample Output for Domain Details</summary>
-
-```json
-{
-  "data": {
-    "ID": 564346,
-    "Status": "Active",
-    "DomainName": "example.com",
-    "AuthCode": "DHQ!K52",
-    "LockStatus": "true",
-    "PrivacyProtectionStatus": "false",
-    "IsChildNameServer": "true",
-    "Contacts": {
-      "Billing": { "ID": "DNA-B-4" },
-      "Technical": { "ID": "DNA-T-3" },
-      "Administrative": { "ID": "DNA-A-2" },
-      "Registrant": { "ID": "DNA-R-1" }
-    },
-    "Dates": { "Start": "2025-05-26T16:08:37", "Expiration": "2027-05-26T16:08:37", "RemainingDays": 449 },
-    "NameServers": [ "ns1.example.com", "ns2.example.com" ],
-    "Additional": [],
-    "ChildNameServers": [ { "ns": "ns1.example.com", "ip": "1.2.3.4" } ]
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Nameserver Modification
-
-```csharp
-var result = dna.ModifyNameServer("example.com", new[] { "ns1.example.com", "ns2.example.com" });
-```
-
-Host names are trimmed, lower-cased and stripped of a trailing dot; empty and duplicate entries are dropped.
-
-<details>
-<summary>Sample Output for Nameserver Modification</summary>
-
-```json
-{ "result": "OK", "data": { "NameServers": [ "ns1.example.com", "ns2.example.com" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Enable Domain Lock
-
-```csharp
-var result = dna.EnableTheftProtectionLock("example.com");
-```
-
-<details>
-<summary>Sample Output for Enable Domain Lock</summary>
-
-```json
-{ "result": "OK", "data": { "LockStatus": true } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Disable Domain Lock
-
-```csharp
-var result = dna.DisableTheftProtectionLock("example.com");
-```
-
-<details>
-<summary>Sample Output for Disable Domain Lock</summary>
-
-```json
-{ "result": "OK", "data": { "LockStatus": false } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Add Child Nameserver
-
-```csharp
-var result = dna.AddChildNameServer("example.com", "ns1.example.com", "1.2.3.4");
-```
-
-<details>
-<summary>Sample Output for Add Child Nameserver</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com", "IPAdresses": [ "1.2.3.4" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Delete Child Nameserver
-
-```csharp
-var result = dna.DeleteChildNameServer("example.com", "ns1.example.com");
-```
-
-<details>
-<summary>Sample Output for Delete Child Nameserver</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com" } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Update Child Nameserver
-
-```csharp
-var result = dna.ModifyChildNameServer("example.com", "ns1.example.com", "1.2.3.4");
-```
-
-<details>
-<summary>Sample Output for Update Child Nameserver</summary>
-
-```json
-{ "result": "OK", "data": { "NameServer": "ns1.example.com", "IPAdresses": [ "1.2.3.4" ] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Modify Domain Privacy
-
-```csharp
-var result = dna.ModifyPrivacyProtectionStatus("example.com", true);
-
-// The flag may also be text, as panels store it: "1", "true", "on" and "yes" enable privacy
-var result2 = dna.ModifyPrivacyProtectionStatus("example.com", "on");
-```
-
-The optional third argument (`reason`) is kept for compatibility only; the gateway has no such field and it is not sent.
-
-<details>
-<summary>Sample Output for Modify Domain Privacy</summary>
-
-```json
-{ "data": { "PrivacyProtectionStatus": true }, "result": "OK" }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Get Domain Contacts
-
-```csharp
-var result = dna.GetContacts("example.com");
-```
-
-<details>
-<summary>Sample Output for Get Domain Contacts</summary>
-
-```json
-{
-  "data": {
-    "contacts": {
-      "Administrative": {
-        "ID": "DNA-A-2",
-        "Status": "Active",
-        "AuthCode": "",
-        "FirstName": "Grace",
-        "LastName": "Hopper",
-        "Company": "",
-        "EMail": "grace@example.com",
-        "Type": "Administrative",
-        "Address": {
-          "Line1": "Example Street 2", "Line2": "", "Line3": "",
-          "State": "DC", "City": "Washington", "Country": "US", "ZipCode": "20001"
-        },
-        "Phone": {
-          "Phone": { "Number": "2025550100", "CountryCode": "1" },
-          "Fax": { "Number": "2025550101", "CountryCode": "1" }
-        },
-        "Additional": []
-      },
-      "Billing": { "...": "..." },
-      "Registrant": { "...": "..." },
-      "Technical": { "...": "..." }
-    }
-  },
-  "result": "OK"
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Save Domain Contacts
-
-```csharp
-var contact = new Dictionary<string, object>
-{
-    ["FirstName"]        = "John",
-    ["LastName"]         = "Doe",
-    ["Company"]          = "Example Corp",
-    ["EMail"]            = "john@example.com",
-    ["AddressLine1"]     = "123 Main Street",
-    ["AddressLine2"]     = "",
-    ["AddressLine3"]     = "",
-    ["City"]             = "Springfield",
-    ["Country"]          = "US",
-    ["Fax"]              = "5559876543",
-    ["FaxCountryCode"]   = "1",
-    ["Phone"]            = "5551234567",
-    ["PhoneCountryCode"] = 1,
-    ["Type"]             = "Contact",
-    ["ZipCode"]          = "62701",
-    ["State"]            = "IL",
-};
-
-var result = dna.SaveContacts("example.com", new Dictionary<string, object>
-{
-    ["Administrative"] = contact,
-    ["Billing"]        = contact,
-    ["Technical"]      = contact,
-    ["Registrant"]     = contact,
-});
-```
-
-Contacts may also use the nested shape (`Address` → `Line1`/`City`/..., `Phone` → `Phone`/`Fax` → `Number`/`CountryCode`), the one `GetContacts` returns.
-
-<details>
-<summary>Sample Output for Save Domain Contacts</summary>
-
-```json
-{ "result": "OK", "data": { "contacts": [] } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Get Reseller Details
-
-```csharp
-var result = dna.GetResellerDetails();
-```
-
-<details>
-<summary>Sample Output for Get Reseller Details</summary>
-
-```json
-{
-  "result": "OK",
-  "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "active": true,
-  "name": "Example Reseller",
-  "balance": "500.00",
-  "currency": "USD",
-  "symbol": "$",
-  "balances": [
-    { "balance": "500.00", "currency": "USD", "symbol": "$" },
-    { "balance": "1500.00", "currency": "TL", "symbol": "TL" }
-  ]
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Current Balance
-
-```csharp
-var result = dna.GetCurrentBalance("USD"); // USD, TRY, EUR or GBP
-```
-
-<details>
-<summary>Sample Output for Current Balance</summary>
-
-```json
-{
-  "ErrorCode": 0,
-  "OperationMessage": "Command completed succesfully.",
-  "OperationResult": "SUCCESS",
-  "Balance": "601.64",
-  "CurrencyId": 2,
-  "CurrencyInfo": null,
-  "CurrencyName": "USD",
-  "CurrencySymbol": "$"
-}
-```
-
-On failure `OperationResult` is `FAILED`, `ErrorCode` holds the error code (for example `API_429`) and `Balance` is `"0.00"`. The account reports USD and TRY balances only; asking for another currency (EUR, GBP, ...) fails with `ErrorCode` = `BALANCE` and the message `No EUR balance is reported for this account. Available: USD, TRY.`
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### DNS Zone Management
-
-The gateway stores a zone as record **sets** (name + type → values) and replaces a whole set on every write. The `*ResourceRecordSet` and `*ResourceRecordValue` methods take care of that for you. Names may be relative (`www`), the apex (`@`, `""` or `example.com`) or fully qualified (`www.example.com.`). Supported types: `A`, `AAAA`, `ALIAS`, `CAA`, `CNAME`, `DS`, `MX`, `NAPTR`, `PTR`, `SRV`, `TLSA`, `TXT`. Writes are committed immediately unless you pass `apply: false` and call `ApplyResourceRecords` yourself; if that automatic apply fails, the method returns the apply error (the change stays staged, not live). Consecutive zone calls are spaced at least one second apart, because the gateway answers bursts with HTTP 429.
-
-```csharp
-// List every record (one row per value; names are fully qualified)
-var records = dna.GetResourceRecords("example.com");
-
-// Make a set hold exactly these values
-dna.SetResourceRecordSet("example.com", "@", "MX", new[] { "10 mx1.example.com", "20 mx2.example.com" }, 3600);
-
-// Add / remove / replace one value, keeping the others
-dna.AddResourceRecordValue("example.com", "@", "MX", "30 mx3.example.com");
-dna.RemoveResourceRecordValue("example.com", "@", "MX", "20 mx2.example.com.");
-dna.ReplaceResourceRecordValue("example.com", "@", "A", "192.0.2.1", "192.0.2.2");
-
-// Remove a whole set
-dna.DeleteResourceRecordSet("example.com", "old", "A");
-
-// Low-level calls (one write = one set)
-dna.AddResourceRecord("example.com", "www", "A", "192.0.2.5", 300);
-dna.EditResourceRecord("example.com", "www", "www", "A", "192.0.2.6", 600);
-dna.DeleteResourceRecord("example.com", "www", "192.0.2.6", "A");
-
-// Stage several changes, then commit once
-dna.AddResourceRecord("example.com", "api", "A", "192.0.2.7", 300, apply: false);
-dna.AddResourceRecord("example.com", "cdn", "CNAME", "cdn.example.net.", 300, apply: false);
-dna.ApplyResourceRecords("example.com");
-```
-
-<details>
-<summary>Sample Output for DNS Zone Management</summary>
-
-`GetResourceRecords`:
-
-```json
-{
-  "result": "OK",
-  "data": {
-    "records": [
-      { "Name": "example.com.", "Type": "A", "TTL": 3600, "Content": "192.0.2.1", "Disabled": false },
-      { "Name": "www.example.com.", "Type": "CNAME", "TTL": 300, "Content": "example.com.", "Disabled": false },
-      { "Name": "example.com.", "Type": "MX", "TTL": 3600, "Content": "10 mx1.example.com.", "Disabled": false }
-    ]
-  }
-}
-```
-
-`SetResourceRecordSet` / `AddResourceRecordValue` (the type is reported upper-cased and the TTL as sent, limited to 1–86400 seconds):
-
-```json
-{ "result": "OK", "data": { "Name": "", "Type": "MX", "TTL": 3600, "Contents": [ "10 mx1.example.com", "20 mx2.example.com" ] } }
-```
-
-Adding a value that is already present, or removing one that is absent, changes nothing and answers `{"result":"OK","data":{..., "Changed": false}}`. An unsupported type is refused before any call is made:
-
-```json
-{ "result": "ERROR", "error": { "Code": "ADD_ZONE", "Message": "Record type \"NS\" is not supported by the DNS zone API. Supported types: A, AAAA, ALIAS, CAA, CNAME, DS, MX, NAPTR, PTR, SRV, TLSA, TXT.", "Details": "..." } }
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### URL Forwarding
-
-```csharp
-dna.SetForwarding("example.com", "https://www.example.org", "Standard"); // or "Frame" (masked)
-var forwarding = dna.GetForwarding("example.com");
-dna.DeleteForwarding("example.com");
-```
-
-<details>
-<summary>Sample Output for URL Forwarding</summary>
-
-```json
-{ "result": "OK", "data": { "Enabled": true, "RedirectAddress": "https://www.example.org/landing", "ForwardType": "Frame" } }
-```
-
-When no forwarding is configured (the gateway answers `Redirect information not found`), `GetForwarding` returns `{"result":"OK","data":{"Enabled":false,"RedirectAddress":"","ForwardType":""}}`. Any other error — for example a domain that does not exist — is returned as an error.
-
-`DeleteForwarding` returns `{"result":"OK","data":{"DomainName":"example.com","Removed":true}}`; when nothing was configured it is a no-op that answers `"Removed": false`.
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-#### Utilities (no network)
-
-```csharp
-bool isTr = dna.IsTrTLD("example.com.tr"); // true
-
-var contact = dna.ValidateContact(new Dictionary<string, object>
-{
-    ["FirstName"] = " Jo ",
-    ["Phone"]     = "+1 (202) 555-0100",
-    ["Country"]   = "Turkey",
-});
-```
-
-<details>
-<summary>Sample Output for ValidateContact</summary>
-
-```json
-{
-  "FirstName": "Jo", "Phone": "12025550100", "Country": "TR", "LastName": "Isimyok",
-  "AddressLine1": "Addres yok", "City": "ISTANBUL", "State": "ISTANBUL", "ZipCode": "34000",
-  "PhoneCountryCode": "90", "Fax": "", "FaxCountryCode": ""
-}
-```
-
-</details>
-
-<hr style="border: 4px solid #000; border-style: dashed;">
-
-### Error Handling
-
-Methods never throw for API or network problems; they return an error envelope:
-
-```json
-{
-  "result": "ERROR",
-  "error": {
-    "Code": "API_404",
-    "Message": "The domain name you requested could not be found. Please check and try again.",
-    "Details": "The domain could not be found. Please check and try again.",
-    "GatewayCode": "Dna.DomainService:Domain:10007"
-  }
-}
-```
-
-| Situation | `Code` | `Message` |
+| Value | Header | Where to find it |
 |---|---|---|
-| HTTP error from the gateway | `API_<status>`, e.g. `API_400`, `API_429`, `API_500` | the gateway's message; for an empty body `HTTP 429 - Too Many Requests` |
-| Wrong credentials (HTTP 301/302) | `API_302` | `Invalid API credentials` |
-| Validation errors | `API_400` | the gateway's message; `Details` lists the fields, e.g. `Admin PostalCode - 'PostalCode' is required` |
-| Timeout | `CURL_28` | `Could not reach the DomainNameAPI service: the connection timed out. (...)` |
-| Other network failures (DNS, connect, TLS, reset) | `CURL_6`, `CURL_7`, `CURL_60`, `CURL_56` | `Curl error during request: ...` |
-| Registration, renewal or transfer refused (`"success": false`) | `REGISTER_DOMAIN`, `RENEW_DOMAIN`, `TRANSFER_DOMAIN` | the gateway's message |
-| Empty or unusable success response | `RESPONSE` | `Invalid response received from server! Response is empty.` |
-| Checks done before calling the gateway | e.g. `AVAILABILITY`, `ADD_ZONE`, `SET_FORWARD` | a description of the problem |
+| Reseller ID (a UUID) | `__reseller` | Reseller panel → **API settings** |
+| API key | `X-API-KEY` | Reseller panel → **API settings** |
 
-`API_<n>` codes always mean an HTTP status. When the gateway sent its own error code, the envelope also carries it as `GatewayCode` (for example `Dna.DomainService:Domain:10007`), so you can tell "domain not found" from "TLD not supported" without parsing the message. Network failures use `CURL_<n>`, where the number follows libcurl's numbering so that the codes match php-dna. Only programming errors (for example passing an unsupported object type) can throw.
+> [!NOTE]
+> These are **API credentials**: your panel login does not work here. **Production and OTE (the test environment) use
+> different API keys.** Using one with the other fails with `INVALID_API_KEY` or `INVALID_RESELLER`.
 
-For troubleshooting, the last call can be inspected:
+## Quick start
 
 ```csharp
-dna.GetLastFunction();       // "request:GET domains/info"
-dna.GetRequestData();        // { "url": ..., "method": ..., "payload": ... }
-dna.GetResponseData();       // decoded response, or { "raw_response": "..." }
-dna.GetResponseHeaders();    // { "url", "http_code", "content_type", "total_time", "headers" }
-dna.GetParsedResponseData(); // parsed response or the error built from it
+using DomainNameApi;
+using DomainNameApi.Contacts;
+using DomainNameApi.Domains;
+
+// OTE is the test environment: real API, its own data, no real money.
+using var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Ote);
+
+// 1. Check the credentials and the balance.
+var account = await client.Account.GetAsync();
+Console.WriteLine($"{account.ResellerName}: {account.UsdBalance} USD");
+
+// 2. Is the domain available, and at what price?
+var search = await client.Domains.SearchAsync("my-new-domain.com");
+Console.WriteLine($"{search.Info?.Status} {search.Info?.Price} {search.Info?.Currency}");
+
+// 3. Register it with one contact for all four roles. This charges the balance.
+var contact = new ContactInfo
+{
+    FirstName = "Ada", LastName = "Lovelace", Email = "ada@example.com",
+    Address = "1 Example Street", City = "Istanbul", State = "Istanbul", PostalCode = "34000",
+    Country = "TR", PhoneCountryCode = "90", Phone = "5551234567",
+};
+var result = await client.Domains.RegisterAsync("my-new-domain.com", contact, ["tr.apiname.com", "eu.apiname.com"]);
+Console.WriteLine($"{result.Status}, expires {result.ExpirationDate:d}");
+
+// 4. List every domain, page by page.
+await foreach (var domain in client.Domains.ListAllAsync())
+{
+    Console.WriteLine($"{domain.DomainName} expires in {domain.RemainingDays} days");
+}
 ```
 
-### Test Mode
+The [examples project](examples/DomainNameApi.Examples) runs scenarios like these against OTE:
 
-Pass `true` as the third constructor argument to use the OTE test environment (`https://ote.domainresellerapi.com/api/v1`) instead of live (`https://api.domainresellerapi.com/api/v1`). `GetServiceUrl()` shows the address in use and `SetServiceUrl(url)` overrides it.
+```bash
+dotnet run --project examples/DomainNameApi.Examples -- search example.com
+```
 
-### Error reporting (telemetry)
+## Configuration
 
-When an API call fails, the library can send an error report to DomainNameAPI's own error tracker (Sentry). A small random share of successful calls (4%, plus every call slower than 1 second) can be sent as a performance record. This helps DomainNameAPI find and fix problems. Error reporting is **on by default**.
-
-**What is sent:**
-
-- error code and message
-- called endpoint path and HTTP method
-- call duration
-- application name (`DomainNameAPI-DotNet`), library version and .NET version
-- reseller ID and domain name
-- the server's public IP address (looked up via `api.ipify.org`, in the background)
-- the operating-system account name the application runs under
-- the API request and response, including the domain's contact details; only credentials are masked — EPP/auth codes, API keys, passwords and tokens are replaced with `***`
-
-**What is never sent:** EPP/auth codes, API keys, passwords or tokens in readable form; method arguments in stack traces.
-
-**Why and how long:** the data is used only for usage measurement and early diagnosis of problems, and is kept for 30 days on DomainNameAPI's own Sentry server, after which it is deleted automatically.
-
-Reports are sent in the background: they never block or slow down your call and never throw. Expected, high-volume errors (domain not found, insufficient balance, invalid credentials, no forwarding configured, ...) are not reported.
-
-**How to turn it off:** call `SetErrorReportingEnabled(false)` after constructing the client:
+There are four ways to create a client:
 
 ```csharp
-var dna = new DomainNameApiClient(resellerId, apiKey);
-dna.SetErrorReportingEnabled(false);
+// Credentials and environment
+var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Production);
+
+// All settings
+var client = new DomainNameApiClient(new DomainNameApiOptions
+{
+    ResellerId = resellerId,
+    ApiKey = apiKey,
+    Environment = ApiEnvironment.Ote,
+    Timeout = TimeSpan.FromSeconds(30),
+    ReadOnly = true,
+});
+
+// The same environment variables the dna CLI reads
+var client = DomainNameApiClient.FromEnvironment();
+
+// On top of your own HttpClient (for example from IHttpClientFactory)
+var client = new DomainNameApiClient(httpClient, options);
 ```
 
-**Minimal mode:** `SetTelemetryMinimal(true)` keeps reporting on but sends only the error code and message, endpoint, timing, versions and reseller ID — no request/response data, domain, IP address or account name.
+| Option | Default | Meaning |
+|---|---|---|
+| `ResellerId`, `ApiKey` | (required) | The credentials. |
+| `Environment` | `Production` | `Production` (`https://api.domainresellerapi.com`) or `Ote` (`https://ote.domainresellerapi.com`). |
+| `BaseAddress` | none | Overrides the environment's address, for example for a proxy. |
+| `Timeout` | 60 s | Time limit of one attempt. |
+| `MaxRetries` | 2 | How often a failed request is repeated (see [retries](#safety-retries-and-rate-limits)). 0 turns retries off. |
+| `MaxRetryDelay` | 30 s | The longest wait before a retry. |
+| `PaceRequests` | `true` | Spaces requests to stay under the gateway's rate limits. |
+| `ReadOnly` | `false` | Blocks every request that is not a read, before it is sent. |
+| `UserAgent` | `DomainNameAPI-DotNet/<version>` | The `User-Agent` header. |
 
-The destination can be changed with the `TelemetryDsn` property (for example to your own Sentry project).
+`FromEnvironment()` reads:
 
-> 🔒 **Security:** TLS certificate verification is on. On a host with an outdated CA bundle it can be switched off with `dna.SetSslVerification(false);` — this is not recommended; updating the CA bundle is the better fix.
+| Variable | Meaning |
+|---|---|
+| `DNA_RESELLER_ID`, `DNA_API_KEY` | The credentials. |
+| `DNA_ENV` | `production` or `ote` (also `prod`, `live`, `test`, `sandbox`). |
+| `DNA_TEST_MODE` | `true`, `1`, `on` or `yes` selects OTE. Used when `DNA_ENV` is not set. |
+| `DNA_BASE_URL` | Optional base address override. |
+| `DNA_READ_ONLY` | `true` turns on read-only mode. |
 
-### Advanced
+The client is thread-safe. Create one per set of credentials and reuse it for the lifetime of the application.
 
-- **Timeouts:** 30 seconds per request and 10 seconds to connect; change them with the `Timeout` and `ConnectTimeout` properties.
-- **Custom transport:** pass an `IHttpTransport` to the constructor (`new DomainNameApiClient(id, key, false, transport)`) or set the `Transport` property to route requests through your own HTTP stack, a proxy or a test double. Implementations return every HTTP status (redirects are not followed) and throw `TransportException` for network failures.
-- **Threads:** a client keeps the last request and response for diagnostics and is not thread-safe. Use one instance per thread (or per request) or synchronise access. `Dispose()` releases the underlying `HttpClient`.
-- **User-Agent:** requests are sent as `DomainNameAPI-DotNet/1.0.1`.
+## Usage
 
-### Examples
+Each area of the API has its own client. Methods take simple arguments; for more options, every method also has an
+overload (or a sibling) that takes the request object.
 
-The [examples](examples/DomainNameApi.Examples) project contains one runnable file per method (`GetDetails`, `RegisterWithContactInfo`, `RegisterWithContactInfo-TR`, the DNS zone and forwarding methods, ...). Set your credentials and run one:
+### Account
 
-```bash
-export DNA_RESELLER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-export DNA_API_KEY=your-api-key
-export DNA_TEST_MODE=true   # optional: use the OTE test environment
+```csharp
+var account = await client.Account.GetAsync();             // ResellerId, ResellerName, TryBalance, UsdBalance
 
-dotnet run --project examples/DomainNameApi.Examples -- GetDetails
-dotnet run --project examples/DomainNameApi.Examples            # lists all examples
+// This month's charges, across all pages
+var request = new ListTransactionsRequest
+{
+    ChargeType = ChargeType.Subtract,
+    StartDate = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero),
+    TransactionTypes = { TransactionType.Register, TransactionType.Renew },
+};
+await foreach (var transaction in client.Account.ListAllTransactionsAsync(request))
+{
+    Console.WriteLine($"{transaction.CreationTime:d} {transaction.Type} {transaction.Amount} {transaction.AmountCurrency}");
+}
 ```
 
-### Testing
+### Domains
 
-The tests need no credentials and make no external network calls:
+**Search**
+
+```csharp
+var one = await client.Domains.SearchAsync("example.com", currency: "USD");
+bool available = one.Info?.IsAvailable == true;
+
+var many = await client.Domains.BulkSearchAsync(["example.com", "example.net", "example.com.tr"]);
+foreach (var domain in many.Available)
+{
+    Console.WriteLine($"{domain.DomainName}: {domain.Price} {domain.Currency}");
+}
+```
+
+**List and details**
+
+```csharp
+var page = await client.Domains.ListAsync(new ListDomainsRequest { MaxResultCount = 50, Statuses = { DomainStatus.Active } });
+
+await foreach (var domain in client.Domains.ListAllAsync(new ListDomainsRequest { DomainName = "example" }))
+{
+    Console.WriteLine($"{domain.DomainName} {domain.Status} {domain.ExpirationDate:d}");
+}
+
+var details = await client.Domains.GetAsync("example.com");
+Console.WriteLine(details.AuthCode);
+Console.WriteLine(details.GetContact(ContactType.Registrant)?.Email);
+```
+
+**Register, renew, transfer, restore** (these charge your balance)
+
+```csharp
+// One contact for all four roles
+await client.Domains.RegisterAsync("example.com", contact, ["tr.apiname.com", "eu.apiname.com"], years: 2);
+
+// Full control: different contacts per role, registry attributes, trustee service
+await client.Domains.RegisterAsync(new RegisterDomainRequest("example.com.tr")
+{
+    Period = 1,
+    NameServers = { "tr.apiname.com", "eu.apiname.com" },
+    Contacts = DomainContact.ForAllRoles(contact),
+    TldAttributes = new() { ["<key>"] = "<value>" },   // the keys: (await client.Products.GetTldAsync("com.tr"))!.Attributes
+});
+
+// With existing contact handles
+await client.Domains.RegisterWithHandleAsync("example.com", "DNA-12345", ["tr.apiname.com", "eu.apiname.com"]);
+
+var renewal = await client.Domains.CheckRenewalAsync("example.com");   // free
+if (renewal.IsRenewable)
+{
+    await client.Domains.RenewAsync("example.com", years: 1);
+}
+
+var check = await client.Domains.CheckTransferAsync("example.com", "EPP-CODE");  // free
+if (check.IsTransferable)
+{
+    await client.Domains.TransferAsync("example.com", "EPP-CODE");
+}
+
+await client.Domains.RestoreAsync("example.com");
+```
+
+Requests are checked before they are sent. A registration without all four contact roles, a contact without an e-mail
+address or a period of 0 years throws an `ArgumentException`, and nothing reaches the API.
+
+**Settings**
+
+```csharp
+await client.Domains.LockAsync("example.com");
+await client.Domains.UnlockAsync("example.com");
+await client.Domains.SetPrivacyProtectionAsync("example.com", enabled: true);
+await client.Domains.SetNameServersAsync("example.com", ["ns1.example.net", "ns2.example.net"]);
+await client.Domains.SetNameServersAsync("example.com", ["ns1.example.net"], DnssecMode.DisableDnssec);  // a signed domain
+var authCode = await client.Domains.UpdateAuthCodeAsync("example.com");
+
+await client.Domains.UpdateContactsAsync("example.com", DomainContact.ForAllRoles(contact));
+await client.Domains.SetContactHandlesAsync("example.com", [new ContactHandle(ContactType.Tech, "DNA-12345")]);
+```
+
+**URL forwarding, child nameservers and documents**
+
+```csharp
+await client.Domains.Forwarding.SetAsync("example.com", "https://www.example.net", ForwardType.Standard);
+var forwarding = await client.Domains.Forwarding.GetAsync("example.com");
+await client.Domains.Forwarding.DeleteAsync("example.com");
+
+// The IP version of each address is detected
+await client.Domains.ChildNameServers.AddAsync("example.com", "ns1.example.com", "192.0.2.10", "2001:db8::10");
+await client.Domains.ChildNameServers.UpdateAsync("example.com", "ns1.example.com", ["192.0.2.20"]);
+await client.Domains.ChildNameServers.DeleteAsync("example.com", "ns1.example.com");
+
+// Registry documents (mostly .tr)
+await client.Domains.Documents.UploadAsync("example.com.tr", [DocumentUpload.FromFile(DocumentType.IdentityCard, "id.pdf")]);
+await foreach (var document in client.Domains.Documents.ListAllAsync("example.com.tr"))
+{
+    Console.WriteLine($"{document.Name}: {document.Status}");
+}
+```
+
+### Contacts
+
+Contact handles are reusable contacts. Create one once and use it for many domains.
+
+```csharp
+var created = await client.Contacts.CreateAsync(contact);
+string handle = created.Handle!;                          // for example DNA-12345
+
+var details = await client.Contacts.GetAsync(handle);     // the contact and its verification state
+var result = await client.Contacts.UpdateAsync(handle, contact);
+Console.WriteLine($"{result.Stats?.SuccessCount} of {result.Stats?.TotalDomainCount} domains updated");
+
+var verifications = await client.Contacts.GetVerificationAsync(handle);
+await client.Contacts.ResendVerificationAsync(handle);
+```
+
+### DNS
+
+Zone records of domains on the platform nameservers. Records resolve publicly once the domain uses those nameservers,
+which `ApplyAsync` takes care of.
+
+```csharp
+var sets = await client.Dns.ListAsync("example.com");
+foreach (var set in sets)
+{
+    Console.WriteLine($"{set.Name} {set.Type} {set.Ttl} {string.Join(", ", set.Values)}");
+}
+
+await client.Dns.AddAsync("example.com", "www", RecordType.A, "192.0.2.10");
+await client.Dns.AddAsync("example.com", "@", "txt", "v=spf1 include:_spf.example.net ~all");   // "txt" becomes TXT
+await client.Dns.AddAsync("example.com", "@", RecordType.MX, ["10 mx1.example.net", "20 mx2.example.net"], ttl: 3600);
+await client.Dns.ReplaceAsync("example.com", "www", RecordType.A, ["192.0.2.20"], ttl: 300);
+await client.Dns.DeleteAsync("example.com", "www", RecordType.A, "192.0.2.20");
+
+var applied = await client.Dns.ApplyAsync("example.com");
+```
+
+The SDK checks what the API would refuse: a CNAME at the apex, a CAA value without its three parts, a TTL outside
+1–86400. Zone calls are kept 1 second apart, the gateway's limit.
+
+### DNSSEC
+
+```csharp
+var info = await client.Dnssec.GetAsync("example.com");   // Status, DsRecords, AllowedAlgorithms, ...
+
+var record = DsRecordData.Parse("12345 13 2 49FD46E6C4B45C55D4AC69CBD3CD34AC1AFE51DE");
+await client.Dnssec.AddAsync("example.com", record);
+await client.Dnssec.RemoveAsync("example.com", record);
+await client.Dnssec.DisableAsync("example.com");          // removes every DS record
+```
+
+### SSL
+
+```csharp
+// 1. Buy (charges the balance). Product codes come from client.Products.ListSslProductsAsync().
+var order = await client.Ssl.PurchaseAsync("example.com", "PKG-CODE");
+
+// 2. A CSR and private key, if you do not have one
+var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com")
+{
+    Country = "TR", State = "Istanbul", Locality = "Istanbul", Organization = "Example Ltd", OrganizationUnit = "IT",
+});
+
+// 3. Configure: CSR, validation method and contact
+var approvers = await client.Ssl.GetApproverEmailsAsync("example.com");
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", csr.Csr!, certificateContact)
+{
+    ValidationMethod = ValidationMethod.Email,
+    ApproverEmail = approvers[0],
+    WebServerType = WebServerType.Apache,
+});
+
+// 4. Wait for issuance, then download
+var status = await client.Ssl.RefreshStatusAsync("example.com");
+if (status.IsIssued)
+{
+    var content = await client.Ssl.GetContentAsync("example.com");
+    File.WriteAllText("fullchain.pem", content.FullChain);
+}
+
+await client.Ssl.ReissueAsync(new ReissueCertificateRequest("example.com") { Csr = newCsr, PrivateKey = newKey });
+await client.Ssl.RevokeAsync("example.com");              // cannot be undone
+```
+
+### Hosting
+
+```csharp
+var packages = await client.Hosting.ListPackagesAsync();
+var created = await client.Hosting.CreateAsync("example.com", "starter-linux");   // charges the balance
+var status = await client.Hosting.GetStatusAsync("example.com");                   // panel access once ready
+var hosting = await client.Hosting.GetAsync("example.com");
+var plans = await client.Hosting.ListPlansAsync();
+```
+
+### Orders and products
+
+```csharp
+var order = await client.Orders.GetAsync("ORDER-CODE");
+
+var com = await client.Products.GetTldAsync("com");
+Console.WriteLine($"{com?.GetRegistrationPrice(1)?.Price} {com?.GetRegistrationPrice(1)?.Currency}, DNSSEC: {com?.SupportsDnssec}");
+
+await foreach (var tld in client.Products.ListAllTldsAsync(new ListTldsRequest { Currency = "USD" }))
+{
+    Console.WriteLine(tld.Name);
+}
+
+var price = await client.Products.GetPriceAsync("com", OrderType.Renew, years: 1);
+var ssl = await client.Products.ListSslProductsAsync(new ListSslProductsRequest { IsWildcard = true });
+```
+
+## Requests and `BaseRequest`
+
+Every operation is a request class, for example `RenewDomainRequest`, `ListDomainsRequest` or `AddDnsRecordRequest`.
+The client methods above build them for you, and you can also create and send them yourself:
+
+```csharp
+var request = new RenewDomainRequest("example.com", period: 2);
+Console.WriteLine($"{request} is {request.Safety}");   // "POST domains/renew is Billable"
+
+DomainOperationResult result = await client.SendAsync(request);
+
+// The same, with the HTTP details: correlation ID, soft-quota state, attempts, duration
+var response = await client.SendWithResponseAsync(request);
+Console.WriteLine($"{response.CorrelationId} quota {response.Quota?.Used}/{response.Quota?.Limit}");
+```
+
+All requests derive from one of three base classes:
+
+| Base class | For |
+|---|---|
+| `BaseRequest` | Operations that return nothing (lock, unlock, add a DNS record, ...). |
+| `BaseRequest<TResponse>` | Operations that return data. |
+| `PagedRequest<TItem>` | List operations. Adds `SkipCount`, `MaxResultCount` and `Sorting`, and works with `ListAllAsync`. |
+
+A request says what it is with a few overrides. For POST and PUT the request object itself is the JSON body (camelCase,
+nulls left out). Query parameters are added in `AddQueryParameters`, and checks before sending go in `Validate`.
+To call an endpoint the SDK does not cover yet, write your own:
+
+```csharp
+public sealed class GetDomainNotesRequest : BaseRequest<DomainNotes>
+{
+    public GetDomainNotesRequest(string domainName) => DomainName = domainName;
+
+    public string DomainName { get; }
+
+    public override HttpMethod Method => HttpMethod.Get;
+    public override string Path => "domains/notes";              // below /api/v1/
+    public override OperationSafety Safety => OperationSafety.Read;
+
+    protected override void AddQueryParameters(QueryParameters query) => query.Add("DomainName", DomainName);
+    protected override void Validate() => Require(DomainName, nameof(DomainName));
+}
+
+var notes = await client.SendAsync(new GetDomainNotesRequest("example.com"));
+```
+
+Your request gets everything the built-in ones get: credentials, retries by safety class, pacing, read-only mode and
+error handling. Override `GetBody()` when the API expects a different body shape, and `IsIdempotent` when a write is
+safe to repeat.
+
+## Errors
+
+Every failed request throws a `DomainNameApiException`. Invalid arguments throw `ArgumentException` before anything is
+sent.
+
+```csharp
+try
+{
+    await client.Domains.RenewAsync("example.com");
+}
+catch (DomainNameApiException e) when (e.Kind == ApiErrorKind.Validation)
+{
+    Console.WriteLine($"{e.Code}: {e.Message}");          // Dna.DomainService:Domain:10007: ...
+    foreach (var field in e.ValidationErrors)
+    {
+        Console.WriteLine($"  {field}");
+    }
+}
+catch (DomainNameApiException e) when (e.OutcomeUnknown)
+{
+    // A billable or changing request failed on the network: it may have reached the API.
+    // Check the state before sending it again.
+    var details = await client.Domains.GetAsync("example.com");
+}
+```
+
+| Property | Meaning |
+|---|---|
+| `Kind` | A stable classification (table below). Branch on it, not on the message. |
+| `Code` | The API's error code (such as `Dna.DomainService:Domain:10007`), or one of the SDK's codes below. |
+| `Message` | What happened. Boilerplate messages are replaced with the API's details. |
+| `StatusCode` | The HTTP status, or null when no answer arrived. |
+| `Details`, `ValidationErrors` | Additional detail and field-level problems from the API. |
+| `CorrelationId` | The gateway's `X-Correlation-Id`. Quote it when contacting support. |
+| `Hint` | A short suggestion on what to do next. |
+| `IsRetryable` | Whether repeating the same request later can succeed. |
+| `OutcomeUnknown` | A request that changes something failed on the network, so it may have run. |
+| `Operation`, `Safety` | The failed request (`POST domains/renew`) and its safety class. |
+| `RetryAfter`, `ResponseBody` | The gateway's `Retry-After` and the raw answer. |
+
+| `Kind` | When |
+|---|---|
+| `Authentication` | Wrong or missing credentials, or an unknown or suspended reseller in this environment (401, redirect). |
+| `Forbidden` | Authenticated but not allowed (403). |
+| `NotFound` | The domain, contact, order or other resource does not exist (404). |
+| `Validation` | The API refused the input or a business rule failed: bad field, domain locked, insufficient balance (400, 422). |
+| `Conflict` | The resource's state does not allow the operation (409). |
+| `RateLimited` | Still rate limited after the automatic retries (429). |
+| `Server` | A server-side failure (5xx). Often temporary. |
+| `Network`, `Timeout` | No answer: DNS, TLS, proxy, connection reset, or no answer within `Timeout`. |
+| `ReadOnly` | Blocked by read-only mode; nothing was sent. |
+| `Unknown` | Anything else, including an answer the SDK could not read. |
+
+Codes the SDK sets itself:
+
+| Code | Meaning |
+|---|---|
+| `INVALID_RESELLER` | The gateway redirected to its suspend page: the reseller ID is unknown, inactive or suspended **in this environment**. |
+| `INVALID_API_KEY` | The key does not match the reseller. Production and OTE keys differ. |
+| `MISSING_API_KEY`, `MISSING_RESELLER_ID`, `NO_CREDENTIALS` | A credential is empty. |
+| `SUBRESELLER_NOT_ALLOWED` | Sub-reseller accounts cannot use the API. Use the main reseller's credentials. |
+| `UNAUTHORIZED` | Any other 401. |
+| `RATE_LIMITED` | 429 after the retries. |
+| `NETWORK`, `TIMEOUT` | No answer arrived. |
+| `READ_ONLY` | Blocked by read-only mode. |
+| `EMPTY_RESPONSE`, `INVALID_RESPONSE` | A successful answer was empty or could not be read. |
+| `HTTP_<status>` | The API sent no error code. |
+
+## Safety, retries and rate limits
+
+Every request has a safety class, the same one the `dna` CLI uses:
+
+| `OperationSafety` | Means | Examples |
+|---|---|---|
+| `Read` | No side effects, even when the API uses POST or PUT | search, details, lists, renewal and transfer checks, CSR generation |
+| `Write` | A free change that can be undone | DNS records, lock, privacy, nameservers, contacts |
+| `Billable` | Charges your balance | register, renew, transfer, restore, SSL purchase, hosting order |
+| `Destructive` | Deletes something or is hard to undo | DNS record deletion, DNSSEC removal, certificate revocation |
+
+- **Read-only mode** (`ReadOnly = true` or `DNA_READ_ONLY=true`) blocks everything that is not a `Read` before it is sent.
+  Use it while exploring, in reports and in dashboards.
+- **Retries.** 429 answers are always retried, honouring `Retry-After`. This is safe even for billable requests, because
+  the gateway refuses them before anything runs. Network errors, timeouts and 502/503/504 answers are retried only for
+  reads (and for writes that are safe to repeat, such as replacing nameservers). A registration or renewal is never sent twice.
+- **Pacing.** The gateway allows 5 requests per second per key, 2 per second for domain searches and 20 per second for
+  DNS zone calls. The client spaces requests to stay under these limits (zone calls 1 second apart). Domain info and the
+  TLD list are not rate limited.
+- **Soft quota.** Searches and info lookups cost 1 point, everything else 10. Past 200 points the gateway slows each
+  request down by up to 5 seconds; points decay by 20% per minute. `SendWithResponseAsync` shows the state in `Quota`.
+
+## Dependency injection
+
+`DomainNameApiClient` works as a typed `HttpClient`:
+
+```csharp
+builder.Services.AddSingleton(new DomainNameApiOptions
+{
+    ResellerId = builder.Configuration["DomainNameApi:ResellerId"]!,
+    ApiKey = builder.Configuration["DomainNameApi:ApiKey"]!,
+    Environment = ApiEnvironment.Ote,
+});
+builder.Services.AddHttpClient<DomainNameApiClient>();
+
+// Then inject it
+public sealed class RenewalService(DomainNameApiClient dna)
+{
+    public Task<DomainOperationResult> RenewAsync(string domain) => dna.Domains.RenewAsync(domain);
+}
+```
+
+The SDK follows no redirects on its own `HttpClient`. A factory-made client may follow them; the SDK still recognises
+the gateway's suspend page and reports `INVALID_RESELLER`.
+
+## Testing your code
+
+Pass an `HttpClient` with a stub handler to test code that uses the SDK without calling the API:
+
+```csharp
+sealed class StubHandler(string json) : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+        Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+}
+
+var client = new DomainNameApiClient(
+    new HttpClient(new StubHandler("""{"resellerName":"Test","usdBalance":10}""")),
+    new DomainNameApiOptions { ResellerId = "test", ApiKey = "test", PaceRequests = false });
+
+var account = await client.Account.GetAsync();   // UsdBalance == 10
+```
+
+For tests against the real API, use OTE with its own key.
+
+## Project layout
+
+```
+src/DomainNameApi/
+├── DomainNameApiClient.cs        The entry point: sub-clients, SendAsync, retries, pacing
+├── DomainNameApiOptions.cs       Settings and FromEnvironment()
+├── Core/                         BaseRequest, PagedRequest, QueryParameters, errors, responses, shared enums
+├── Internal/                     JSON settings, error parsing, the rate-limit pacer
+├── Accounts/   AccountClient     Balances and transactions
+├── Contacts/   ContactsClient    Contact handles
+├── Domains/    DomainsClient     Domains, plus Forwarding, ChildNameServers and Documents
+├── Dns/        DnsClient         Zone records
+├── Dnssec/     DnssecClient      DS records
+├── Ssl/        SslClient         Certificates
+├── Hosting/    HostingClient     Hosting packages and services
+├── Orders/     OrdersClient      Orders
+└── Products/   ProductsClient    TLDs, SSL products and prices
+```
+
+Every area folder has the same shape: `XxxClient.cs`, a `Requests/` folder with one class per operation, and a `Models/`
+folder with the answers and enums. All types of an area share one namespace, such as `DomainNameApi.Domains`.
+
+## Development
 
 ```bash
+dotnet build
 dotnet test
 ```
 
-Without a local .NET SDK, run them in Docker:
+The tests never call the real API: they use a fake `HttpMessageHandler`. On Windows they run on .NET 10 and on
+.NET Framework 4.8; the latter exercises the .NET Standard 2.0 build.
 
-```bash
-docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
-```
+`tests/DomainNameApi.Tests/testdata/openapi.json` is the API document the `dna` CLI embeds. `SpecCoverageTests` checks
+that every operation in it has exactly one request class with the CLI's safety class. When the API gains an operation,
+update the document and the test fails until the request exists.
 
-| Test file | Description |
-|-----------|-------------|
-| `tests/DomainNameApi.Tests/ConformanceTests.cs` | Replays all 134 php-dna conformance fixtures (`testdata/conformance/`) and compares requests and results |
-| `tests/DomainNameApi.Tests/HttpLayerTests.cs` | Headers, URLs, query strings, test mode, timeouts, zone pacing |
-| `tests/DomainNameApi.Tests/HttpClientTransportTests.cs` | The default `HttpClient` transport against a local listener |
-| `tests/DomainNameApi.Tests/ErrorMappingTests.cs` | Gateway error mapping and validation messages |
-| `tests/DomainNameApi.Tests/TelemetryTests.cs` | Telemetry payloads, credential masking, minimal mode |
-| `tests/DomainNameApi.Tests/UtilityTests.cs` | Contact validation, phone/country normalisation, PHP-compatible formatting |
+## Upgrading from 1.x
 
-<hr style="border: 4px solid #000; border-style: dashed;">
+2.0 is a new SDK. 1.x was a port of the PHP library and returned untyped `JsonNode` envelopes; 2.0 has typed requests
+and models, async methods and exceptions.
 
-## Return and Error Codes with Descriptions
+| 1.x | 2.0 |
+|---|---|
+| `new DomainNameApiClient(id, key, testMode: true)` | `new DomainNameApiClient(id, key, ApiEnvironment.Ote)` |
+| `dna.CheckAvailability(...)` | `client.Domains.SearchAsync(...)` / `BulkSearchAsync(...)` |
+| `dna.GetDetails(domain)` | `client.Domains.GetAsync(domain)` |
+| `dna.GetList()` | `client.Domains.ListAsync()` / `ListAllAsync()` |
+| `dna.RegisterWithContactInfo(...)` | `client.Domains.RegisterAsync(...)` |
+| `dna.Renew(domain, period)` | `client.Domains.RenewAsync(domain, years)` |
+| `dna.ModifyNameServer(...)` | `client.Domains.SetNameServersAsync(...)` |
+| `dna.AddChildNameServer(...)` | `client.Domains.ChildNameServers.AddAsync(...)` |
+| `dna.GetResourceRecords(domain)` | `client.Dns.ListAsync(domain)` |
+| `dna.AddResourceRecord(...)` | `client.Dns.AddAsync(...)` |
+| `dna.SetForwarding(...)` | `client.Domains.Forwarding.SetAsync(...)` |
+| `dna.GetCurrentBalance()` | `client.Account.GetAsync()` |
+| `result["result"] == "ERROR"` | `catch (DomainNameApiException e)` |
 
-| Code | Description                                    | Detail                                                                                                                                                         |
-|------|------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1000 | Command completed successfully                 | Operation successful.                                                                                                                                          |
-| 1001 | Command completed successfully; action pending | Operation successful. However, the operation is currently queued for completion.                                                                               |
-| 2003 | Required parameter missing                     | Parameter missing error. For example, no phone entry in contact information.                                                                                   |
-| 2105 | Object is not eligible for renewal             | Domain status is not suitable for renewal, locked for update operations. Status should not be "clientupdateprohibited". May be due to other status conditions. |
-| 2200 | Authentication error                           | Authorization error, security code is incorrect or domain is registered with another registrar.                                                                |
-| 2302 | Object exists                                  | Domain name or nameserver information already exists in database. Cannot be registered.                                                                        |
-| 2303 | Object does not exist                          | Domain name or nameserver information does not exist in database. New registration required.                                                                   |
-| 2304 | Object status prohibits operation              | Domain status is not suitable for updates, locked for update operations. Status should not be "clientupdateprohibited". May be due to other status conditions. |
+1.x sent error reports to Sentry. 2.0 sends nothing anywhere except to the API.
 
-| CODE | DETAIL                                                                                                                               |
-|------|--------------------------------------------------------------------------------------------------------------------------------------|
-| 101  | System Error Detailed For ({0})!                                                                                                     |
-| 102  | Multiple Errors Detailed For ({0})!                                                                                                  |
-| 103  | Unknown Errors Detailed For ({0})!                                                                                                   |
-| 200  | API command not found ({0})!                                                                                                         |
-| 210  | API service not found ({0})!                                                                                                         |
-| 211  | API service provider not set!                                                                                                        |
-| 300  | Reseller not found!                                                                                                                  |
-| 301  | Your current IP address is not authorized to access. Please make sure you are connecting from an authorized IP address and try again |
-| 310  | TLD is not supported!                                                                                                                |
-| 320  | API not found!                                                                                                                       |
-| 321  | Currency is not supported!                                                                                                           |
-| 330  | Required parameter(s) not set ({0}).                                                                                                 |
-| –    | Make sure you send all contact objects full                                                                                          |
-| 340  | Price definition not found ({0}[{1}]-{2}{3}).                                                                                        |
-| 350  | Insufficient reseller balance. (Reseller Id : {0} - Current Balance : {1} {2}).                                                      |
-| 350  | Accounting currency does not match or the balance is not sufficient.                                                                 |
-| 360  | Invalid API request for field ({0}).                                                                                                 |
-| 360  | API quota exceeded!                                                                                                                  |
-| 361  | Throttled error!                                                                                                                     |
-| 362  | Premium domain is not available to register right now.                                                                               |
-| 363  | Operation cancelled because domain in auto-renewal period                                                                            |
-| 364  | This domain is currently unavailable for transaction due to a problem with the registry                                              |
+## Links
 
-| CODE | DETAIL                                                                                      |
-|------|---------------------------------------------------------------------------------------------|
-| 400  | Invalid contact ({0}).                                                                      |
-| 401  | Contact info can not sync.                                                                  |
-| 402  | No access to contact information from registry.                                             |
-| 403  | THE SYSTEM HAS MISSING INFORMATION. ENTER YOUR DEFAULT INFORMATION OR CONTACT SUPPORT TEAM. |
-| 404  | DOMAIN CONTACT CANNOT UPDATE. PERMISSION FROM THE REGISTRY.                                 |
-| 410  | Contact not found.                                                                          |
-| 410  | Contact not found ({0}).                                                                    |
-| 420  | Invalid Api command for contact {0}.                                                        |
-| 430  | Contact api not found.                                                                      |
-| 440  | Contact is not synced.                                                                      |
-| 450  | Too many domain contacts!                                                                   |
-| 451  | Failed to proceed with contact update.                                                      |
-
-| CODE | DETAIL                                                                                                                               |
-|------|--------------------------------------------------------------------------------------------------------------------------------------|
-| 500  | Invalid domain id.                                                                                                                   |
-| 500  | Invalid domain id ({0}).                                                                                                             |
-| 501  | Domain could not synchronized({0})                                                                                                   |
-| 502  | Internal transfer failed                                                                                                             |
-| 503  | Domain registration is not available.                                                                                                |
-| 504  | Domain information does not match. Before :{0}                                                                                       |
-| 505  | Enter the Ip Address.                                                                                                                |
-| 506  | Domain Transfer Has Been Started But Contact Info Not Read.                                                                          |
-| 507  | Authorization error.                                                                                                                 |
-| 510  | Domain not found.                                                                                                                    |
-| 511  | Expired domains cannot be found.                                                                                                     |
-| 512  | Domain is not renewable.                                                                                                             |
-| 513  | Domain is not in updateable status. It must be active for to be updated                                                              |
-| 514  | Redemption Period Expected.                                                                                                          |
-| 520  | Invalid Api command for domain "{0}".                                                                                                |
-| 530  | Invalid domain period. Period must be {0} to {1} years. Requested period is {2} years.                                               |
-| 540  | Domain cannot be extended beyond {0} years from current date.                                                                        |
-| 550  | Invalid domain name. Domain must be {0} to {1} characters length. Requested domain name is {2} characters.                           |
-| 560  | Invalid name server count. Domain must have {0} to {1} name servers. Requested name server count is {2}.                             |
-| 561  | No name server information found in the incoming request                                                                             |
-| 570  | Idn not supported for tld "{0}".                                                                                                     |
-| 571  | Period invalid.                                                                                                                      |
-| 572  | Command invalid.                                                                                                                     |
-| 573  | Domain names not found.                                                                                                              |
-| 574  | TLD names not found.                                                                                                                 |
-| 575  | Domain is not in updateable status. It must be active for name servers to be updated                                                 |
-| 576  | Domain can be renewed in the last 1 month before the expire date                                                                     |
-| 580  | Transfer not supported for tld "{0}".                                                                                                |
-| 581  | Child name server not found                                                                                                          |
-| 582  | Transfer started by other reseller.                                                                                                  |
-| 583  | Transfer not initialized. Please contact the support team.                                                                           |
-| 584  | Object status prohibits operation                                                                                                    |
-| 590  | Auth code is required for this transfer.                                                                                             |
-| 591  | Auth code is not valid.                                                                                                              |
-| 592  | Transfer lock exists on domain.                                                                                                      |
-| 593  | Domain cannot be transferred, Status Information and Transfer Lock must comply with the required criteria. (Status Information: #ok) |
-| 594  | Domain name server address could not resolved ({0})                                                                                  |
-| 595  | Contact information can not be read (whois.registrar.tld) Please make sure that privacy protection status open                       |
-| 596  | Contact information could not verified                                                                                               |
-| 597  | Tld Not Found                                                                                                                        |
-| 598  | Unknown error occurred                                                                                                               |
-| 599  | Domain Forward Not Found                                                                                                             |
+- [`dna` CLI and MCP server](https://github.com/domainreseller/cli): the same API from the terminal and from AI agents.
+- [API documentation](https://www.domainnameapi.com/docs/)
+- [Changelog](CHANGELOG.md)
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).
