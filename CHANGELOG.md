@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-11-22
 
 A new SDK, modelled on the [`dna` CLI](https://github.com/domainreseller/cli) and built from the same API document.
 1.x was a port of the PHP library; 2.0 is not compatible with it. See "Upgrading from 1.x" in the README.
