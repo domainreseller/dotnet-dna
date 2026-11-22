@@ -1,6 +1,8 @@
 namespace DomainNameApi.Accounts;
 
-/// <summary>Your reseller account: balances and the transaction ledger. Reach it through <see cref="DomainNameApiClient.Account"/>.</summary>
+/// <summary>
+/// Your reseller account: balances, profile and the transaction ledger. Reach it through <see cref="DomainNameApiClient.Account"/>.
+/// </summary>
 public sealed class AccountClient
 {
     private readonly DomainNameApiClient _api;
@@ -11,6 +13,11 @@ public sealed class AccountClient
     /// <param name="cancellationToken">Cancels the request.</param>
     public Task<ResellerAccount> GetAsync(CancellationToken cancellationToken = default) =>
         _api.SendAsync(new GetAccountRequest(), cancellationToken);
+
+    /// <summary>Returns your reseller profile: name, company, price group, account currency, status and flags.</summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    public Task<ResellerProfile> GetProfileAsync(CancellationToken cancellationToken = default) =>
+        _api.SendAsync(new GetProfileRequest(), cancellationToken);
 
     /// <summary>Returns one page of the balance ledger.</summary>
     /// <param name="request">Filters and paging; null for the first page without filters.</param>

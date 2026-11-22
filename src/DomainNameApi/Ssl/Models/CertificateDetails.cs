@@ -3,6 +3,9 @@ namespace DomainNameApi.Ssl;
 /// <summary>Everything about a certificate: subscription, configuration, issued certificate and contacts.</summary>
 public sealed record CertificateDetails
 {
+    /// <summary>The certificate's ID. Every operation on the certificate takes it.</summary>
+    public Guid CertificateId { get; init; }
+
     /// <summary>The domain.</summary>
     public string? DomainName { get; init; }
 

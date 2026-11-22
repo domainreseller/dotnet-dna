@@ -12,7 +12,7 @@ A new SDK, modelled on the [`dna` CLI](https://github.com/domainreseller/cli) an
 
 ### Added
 
-- Typed clients for all 64 operations of the REST API: `Account`, `Contacts`, `Domains` (with `Forwarding`,
+- Typed clients for all 67 operations of the REST API: `Account`, `Contacts`, `Domains` (with `Forwarding`,
   `ChildNameServers` and `Documents`), `Dns`, `Dnssec`, `Ssl`, `Hosting`, `Orders` and `Products`.
   DNSSEC, SSL certificates, hosting, orders, products, contact handles, registry documents, auth codes, restores and
   the transaction ledger are new.
@@ -37,9 +37,34 @@ A new SDK, modelled on the [`dna` CLI](https://github.com/domainreseller/cli) an
   `DocumentUpload.FromFile`, `CertificateContent.FullChain`, `Tld.GetRegistrationPrice`, `ProductsClient.GetTldAsync`.
 - xUnit tests with a fake HTTP handler, run on .NET 10 and .NET Framework 4.8, including a check that every operation
   in the API document has a request class with the CLI's safety class.
+- `Ssl.RenewAsync(certificateId)` (`POST ssls/renew`, billable): renews a certificate. It returns the ID of a new
+  certificate, which is then configured with `Ssl.ConfigureAsync`.
+- `Ssl.ListAsync` and `Ssl.ListAllAsync` (`GET ssls`) with `ListCertificatesRequest` (optional `DomainName` filter) and
+  `CertificateListItem`: lists your certificates, newest first, with their IDs.
+- `Account.GetProfileAsync()` (`GET resellers/me`) with `ResellerProfile` and the enums `AccountCurrency` and
+  `ResellerStatus`.
+- `CertificateId` on `CertificateDetails`, `CertificateStatus` and `CertificateContent`.
 
 ### Changed
 
+- **BREAKING, forced by the API:** SSL certificates are addressed by their certificate ID instead of the domain name.
+  The API made this change on 2026-11-20 in production and OTE, because a domain can now have several certificates;
+  requests that still send a domain name are refused. What to change in code written against earlier builds:
+  - Store `SslOperationResult.CertificateId` from `Ssl.PurchaseAsync` (and `Ssl.RenewAsync`). For certificates you
+    already have, look the ID up with `Ssl.ListAsync(new ListCertificatesRequest { DomainName = "example.com" })`.
+  - `Ssl.RefreshStatusAsync`, `Ssl.GetAsync`, `Ssl.GetContentAsync` and `Ssl.RevokeAsync` take a `Guid certificateId`
+    instead of `string domainName`.
+  - `ConfigureCertificateRequest` and `ReissueCertificateRequest` take the certificate ID as their first constructor
+    argument; their `DomainName` property is replaced by `CertificateId`. The same goes for
+    `RefreshCertificateStatusRequest`, `GetCertificateRequest`, `GetCertificateContentRequest` and
+    `RevokeCertificateRequest`.
+  - `Ssl.GetApproverEmailsAsync` has two overloads: `(Guid certificateId)` for an existing certificate and
+    `(string domainName, string packageCode)` before a purchase; `GetApproverEmailsRequest` has the same two
+    constructors. The package code is no longer optional, so `GetApproverEmailsAsync("example.com")` no longer compiles.
+  - An empty certificate ID (`Guid.Empty`) throws an `ArgumentException` before anything is sent.
+  - Renew with `Ssl.RenewAsync` followed by `Ssl.ConfigureAsync`, not with a second `Ssl.PurchaseAsync`: that is an
+    unrelated purchase at the purchase price and the old certificate never becomes `Renewed`.
+  - A purchased or renewed certificate must be configured within 15 days (the API's window used to be 7 days).
 - Targets .NET Standard 2.0 and .NET 10 (the .NET 8 target is replaced; .NET 8 and 9 apps use the .NET Standard 2.0 build).
 - The `System.Text.Json` dependency of the .NET Standard 2.0 build is updated to 10.0.15.
 - Nullable reference types are enabled; shared build settings live in `Directory.Build.props`.

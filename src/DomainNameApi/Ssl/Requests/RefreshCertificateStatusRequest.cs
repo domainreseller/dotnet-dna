@@ -4,11 +4,11 @@ namespace DomainNameApi.Ssl;
 public sealed class RefreshCertificateStatusRequest : BaseRequest<CertificateStatus>
 {
     /// <summary>Creates the request.</summary>
-    /// <param name="domainName">The domain.</param>
-    public RefreshCertificateStatusRequest(string domainName) => DomainName = domainName;
+    /// <param name="certificateId">The certificate.</param>
+    public RefreshCertificateStatusRequest(Guid certificateId) => CertificateId = certificateId;
 
-    /// <summary>The domain.</summary>
-    public string DomainName { get; set; }
+    /// <summary>The certificate.</summary>
+    public Guid CertificateId { get; set; }
 
     /// <inheritdoc />
     public override HttpMethod Method => HttpMethod.Put;
@@ -20,5 +20,5 @@ public sealed class RefreshCertificateStatusRequest : BaseRequest<CertificateSta
     public override OperationSafety Safety => OperationSafety.Read;
 
     /// <inheritdoc />
-    protected internal override void Validate() => Require(DomainName, nameof(DomainName));
+    protected internal override void Validate() => SslValidation.RequireCertificateId(CertificateId);
 }

@@ -18,7 +18,7 @@
 </p>
 
 Das offizielle .NET SDK für die Reseller-Plattform von [Domain Name API](https://www.domainnameapi.com). Es deckt alle
-64 Operationen der REST-API mit typisierten Clients und Modellen ab: Domains, Kontakte, DNS, DNSSEC, SSL-Zertifikate,
+67 Operationen der REST-API mit typisierten Clients und Modellen ab: Domains, Kontakte, DNS, DNSSEC, SSL-Zertifikate,
 Hosting, Bestellungen, Produkte und Ihr Konto.
 
 ```csharp
@@ -208,6 +208,7 @@ eine Überladung (oder eine Schwestermethode), die das Request-Objekt annimmt.
 
 ```csharp
 var account = await client.Account.GetAsync();             // ResellerId, ResellerName, TryBalance, UsdBalance
+var profile = await client.Account.GetProfileAsync();      // Name, CompanyName, AccountCurrency, Status, ...
 
 // This month's charges, across all pages
 var request = new ListTransactionsRequest
@@ -385,9 +386,15 @@ await client.Dnssec.DisableAsync("example.com");          // removes every DS re
 
 ### SSL
 
+Eine Domain kann mehrere Zertifikate haben. Ein bestehendes Zertifikat wird deshalb über seine **Zertifikats-ID**
+(eine `Guid`) angesprochen, nie über den Domainnamen. `PurchaseAsync` und `RenewAsync` geben die ID zurück: Speichern
+Sie sie. `ListAsync` findet die IDs der Zertifikate, die Sie bereits haben.
+
 ```csharp
 // 1. Buy (charges the balance). Product codes come from client.Products.ListSslProductsAsync().
+var approvers = await client.Ssl.GetApproverEmailsAsync("example.com", "PKG-CODE");   // before the purchase
 var order = await client.Ssl.PurchaseAsync("example.com", "PKG-CODE");
+Guid certificateId = order.CertificateId;                  // store it: every later call takes it
 
 // 2. A CSR and private key, if you do not have one
 var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com")
@@ -395,9 +402,8 @@ var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com"
     Country = "TR", State = "Istanbul", Locality = "Istanbul", Organization = "Example Ltd", OrganizationUnit = "IT",
 });
 
-// 3. Configure: CSR, validation method and contact
-var approvers = await client.Ssl.GetApproverEmailsAsync("example.com");
-await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", csr.Csr!, certificateContact)
+// 3. Configure within 15 days: CSR, validation method and contact
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest(certificateId, csr.Csr!, certificateContact)
 {
     ValidationMethod = ValidationMethod.Email,
     ApproverEmail = approvers[0],
@@ -405,16 +411,49 @@ await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", c
 });
 
 // 4. Wait for issuance, then download
-var status = await client.Ssl.RefreshStatusAsync("example.com");
+var status = await client.Ssl.RefreshStatusAsync(certificateId);
 if (status.IsIssued)
 {
-    var content = await client.Ssl.GetContentAsync("example.com");
+    var content = await client.Ssl.GetContentAsync(certificateId);
     File.WriteAllText("fullchain.pem", content.FullChain);
 }
 
-await client.Ssl.ReissueAsync(new ReissueCertificateRequest("example.com") { Csr = newCsr, PrivateKey = newKey });
-await client.Ssl.RevokeAsync("example.com");              // cannot be undone
+var details = await client.Ssl.GetAsync(certificateId);    // subscription, configuration, contacts
+await client.Ssl.ReissueAsync(new ReissueCertificateRequest(certificateId) { Csr = newCsr, PrivateKey = newKey });
+await client.Ssl.RevokeAsync(certificateId);               // cannot be undone
 ```
+
+**Zertifikate auflisten und eine ID finden**
+
+```csharp
+var page = await client.Ssl.ListAsync(new ListCertificatesRequest { DomainName = "example.com" });   // newest first
+
+await foreach (var certificate in client.Ssl.ListAllAsync())
+{
+    Console.WriteLine($"{certificate.CertificateId} {certificate.DomainName} {certificate.Status} {certificate.SubscriptionExpiresAt:d}");
+}
+
+// The approver addresses of a certificate you already have
+var approverEmails = await client.Ssl.GetApproverEmailsAsync(certificateId);
+```
+
+**Verlängern** (dies belastet Ihr Guthaben)
+
+```csharp
+// Allowed from 30 days before details.Subscription.ExpiresAt. The renewal is a new certificate with its own ID.
+var renewal = await client.Ssl.RenewAsync(certificateId);
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest(renewal.CertificateId, newCsr, certificateContact)
+{
+    ValidationMethod = ValidationMethod.Email,
+    ApproverEmail = approvers[0],
+    WebServerType = WebServerType.Apache,
+});
+```
+
+Ein gekauftes oder verlängertes Zertifikat muss innerhalb von 15 Tagen konfiguriert werden; danach wird es storniert.
+Zum Verlängern rufen Sie `RenewAsync` und anschließend `ConfigureAsync` mit der neuen ID auf. Kaufen Sie nicht erneut
+mit `PurchaseAsync`: Das ist ein eigenständiger Kauf zum Kaufpreis, und das alte Zertifikat wird nie als verlängert
+markiert. Eine leere Zertifikats-ID (`Guid.Empty`) löst eine `ArgumentException` aus, bevor etwas gesendet wird.
 
 <a id="hosting"></a>
 
@@ -579,7 +618,7 @@ Jeder Request hat eine Sicherheitsklasse, dieselbe, die die `dna` CLI verwendet:
 |---|---|---|
 | `Read` | Keine Seiteneffekte, auch wenn die API POST oder PUT verwendet | Suche, Details, Listen, Verlängerungs- und Transferprüfungen, CSR-Erzeugung |
 | `Write` | Eine kostenlose Änderung, die sich rückgängig machen lässt | DNS-Einträge, Sperre, Datenschutz, Nameserver, Kontakte |
-| `Billable` | Belastet Ihr Guthaben | Registrierung, Verlängerung, Transfer, Wiederherstellung, SSL-Kauf, Hosting-Bestellung |
+| `Billable` | Belastet Ihr Guthaben | Registrierung, Verlängerung, Transfer, Wiederherstellung, SSL-Kauf und -Verlängerung, Hosting-Bestellung |
 | `Destructive` | Löscht etwas oder lässt sich kaum rückgängig machen | Löschen von DNS-Einträgen, Entfernen von DNSSEC, Widerruf von Zertifikaten |
 
 - **Nur-Lese-Modus** (`ReadOnly = true` oder `DNA_READ_ONLY=true`) blockiert vor dem Senden alles, was kein `Read` ist.
@@ -650,7 +689,7 @@ src/DomainNameApi/
 ├── DomainNameApiOptions.cs       Settings and FromEnvironment()
 ├── Core/                         BaseRequest, PagedRequest, QueryParameters, errors, responses, shared enums
 ├── Internal/                     JSON settings, error parsing, the rate-limit pacer
-├── Accounts/   AccountClient     Balances and transactions
+├── Accounts/   AccountClient     Balances, profile and transactions
 ├── Contacts/   ContactsClient    Contact handles
 ├── Domains/    DomainsClient     Domains, plus Forwarding, ChildNameServers and Documents
 ├── Dns/        DnsClient         Zone records

@@ -1,6 +1,6 @@
 namespace DomainNameApi.Ssl;
 
-/// <summary>The result of buying, configuring, reissuing or revoking a certificate.</summary>
+/// <summary>The result of buying, renewing, configuring, reissuing or revoking a certificate.</summary>
 public sealed record SslOperationResult
 {
     /// <summary>Whether the operation succeeded.</summary>
@@ -9,7 +9,10 @@ public sealed record SslOperationResult
     /// <summary>The API's message.</summary>
     public string? Message { get; init; }
 
-    /// <summary>The certificate's ID.</summary>
+    /// <summary>
+    /// The certificate's ID. Store it: every later operation on the certificate takes it. After a renewal it is the
+    /// ID of the new certificate, not of the one that was renewed.
+    /// </summary>
     public Guid CertificateId { get; init; }
 
     /// <summary>The certificate's state after the operation.</summary>

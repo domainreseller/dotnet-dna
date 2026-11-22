@@ -6,11 +6,11 @@ namespace DomainNameApi.Ssl;
 public sealed class ReissueCertificateRequest : BaseRequest<SslOperationResult>
 {
     /// <summary>Creates the request.</summary>
-    /// <param name="domainName">The domain.</param>
-    public ReissueCertificateRequest(string domainName) => DomainName = domainName;
+    /// <param name="certificateId">The certificate to reissue.</param>
+    public ReissueCertificateRequest(Guid certificateId) => CertificateId = certificateId;
 
-    /// <summary>The domain.</summary>
-    public string DomainName { get; set; }
+    /// <summary>The certificate to reissue.</summary>
+    public Guid CertificateId { get; set; }
 
     /// <summary>A new CSR, or null to keep the current one.</summary>
     public string? Csr { get; set; }
@@ -32,5 +32,5 @@ public sealed class ReissueCertificateRequest : BaseRequest<SslOperationResult>
     public override OperationSafety Safety => OperationSafety.Write;
 
     /// <inheritdoc />
-    protected internal override void Validate() => Require(DomainName, nameof(DomainName));
+    protected internal override void Validate() => SslValidation.RequireCertificateId(CertificateId);
 }

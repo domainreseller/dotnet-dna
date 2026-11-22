@@ -145,7 +145,7 @@ public sealed class DomainNameApiClient : IDisposable
     /// <summary>The base address requests are sent to.</summary>
     public Uri BaseAddress { get; }
 
-    /// <summary>Your account: balances and the transaction ledger.</summary>
+    /// <summary>Your account: balances, profile and the transaction ledger.</summary>
     public AccountClient Account { get; }
 
     /// <summary>Reusable contact handles (registrant, admin, tech, billing) and their verification.</summary>
@@ -160,7 +160,7 @@ public sealed class DomainNameApiClient : IDisposable
     /// <summary>DNSSEC (DS records) of domains.</summary>
     public DnssecClient Dnssec { get; }
 
-    /// <summary>SSL certificates: buy, configure, issue, reissue and revoke.</summary>
+    /// <summary>SSL certificates: buy, configure, issue, list, renew, reissue and revoke.</summary>
     public SslClient Ssl { get; }
 
     /// <summary>Web hosting packages and services.</summary>

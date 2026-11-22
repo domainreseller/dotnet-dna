@@ -4,11 +4,11 @@ namespace DomainNameApi.Ssl;
 public sealed class GetCertificateRequest : BaseRequest<CertificateDetails>
 {
     /// <summary>Creates the request.</summary>
-    /// <param name="domainName">The domain.</param>
-    public GetCertificateRequest(string domainName) => DomainName = domainName;
+    /// <param name="certificateId">The certificate.</param>
+    public GetCertificateRequest(Guid certificateId) => CertificateId = certificateId;
 
-    /// <summary>The domain.</summary>
-    public string DomainName { get; set; }
+    /// <summary>The certificate.</summary>
+    public Guid CertificateId { get; set; }
 
     /// <inheritdoc />
     public override HttpMethod Method => HttpMethod.Get;
@@ -20,8 +20,8 @@ public sealed class GetCertificateRequest : BaseRequest<CertificateDetails>
     public override OperationSafety Safety => OperationSafety.Read;
 
     /// <inheritdoc />
-    protected internal override void AddQueryParameters(QueryParameters query) => query.Add("DomainName", DomainName);
+    protected internal override void AddQueryParameters(QueryParameters query) => query.Add("CertificateId", CertificateId);
 
     /// <inheritdoc />
-    protected internal override void Validate() => Require(DomainName, nameof(DomainName));
+    protected internal override void Validate() => SslValidation.RequireCertificateId(CertificateId);
 }

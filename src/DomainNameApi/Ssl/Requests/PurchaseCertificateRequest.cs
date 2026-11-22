@@ -2,8 +2,10 @@ namespace DomainNameApi.Ssl;
 
 /// <summary>
 /// <c>POST ssls/initialize</c>: buys an SSL certificate package for a domain. <b>Charges your balance.</b>
-/// Then submit the CSR and validation details with <see cref="ConfigureCertificateRequest"/>.
+/// Store the <see cref="SslOperationResult.CertificateId"/> of the answer, then submit the CSR and validation details
+/// with <see cref="ConfigureCertificateRequest"/> within 15 days.
 /// </summary>
+/// <remarks>To renew an existing certificate use <see cref="RenewCertificateRequest"/>, not a second purchase.</remarks>
 public sealed class PurchaseCertificateRequest : BaseRequest<SslOperationResult>
 {
     /// <summary>Creates the request.</summary>

@@ -3,6 +3,9 @@ namespace DomainNameApi.Ssl;
 /// <summary>An issued certificate and its chain, in PEM format.</summary>
 public sealed record CertificateContent
 {
+    /// <summary>The ID of the certificate this content belongs to.</summary>
+    public Guid CertificateId { get; init; }
+
     /// <summary>The certificate.</summary>
     public string? Certificate { get; init; }
 
