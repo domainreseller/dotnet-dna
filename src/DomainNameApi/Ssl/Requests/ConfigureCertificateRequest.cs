@@ -4,24 +4,27 @@ namespace DomainNameApi.Ssl;
 
 /// <summary>
 /// <c>PUT ssls/configure</c>: submits the CSR, the validation method and the contact so the certificate can be issued.
+/// A certificate must be configured within 15 days of its purchase or renewal; after that it is cancelled.
 /// </summary>
 public sealed class ConfigureCertificateRequest : BaseRequest<SslOperationResult>
 {
     /// <summary>Creates the request.</summary>
-    /// <param name="domainName">The domain.</param>
-    /// <param name="csr">The CSR in PEM format.</param>
+    /// <param name="certificateId">
+    /// The certificate to configure: the <see cref="SslOperationResult.CertificateId"/> returned by the purchase or the renewal.
+    /// </param>
+    /// <param name="csr">The CSR in PEM format. Its common name must be the certificate's domain.</param>
     /// <param name="contact">The certificate contact.</param>
-    public ConfigureCertificateRequest(string domainName, string csr, CertificateContact contact)
+    public ConfigureCertificateRequest(Guid certificateId, string csr, CertificateContact contact)
     {
-        DomainName = domainName;
+        CertificateId = certificateId;
         Csr = csr;
         Contact = contact;
     }
 
-    /// <summary>The domain.</summary>
-    public string DomainName { get; set; }
+    /// <summary>The certificate to configure.</summary>
+    public Guid CertificateId { get; set; }
 
-    /// <summary>The CSR in PEM format.</summary>
+    /// <summary>The CSR in PEM format. Its common name must be the certificate's domain.</summary>
     public string Csr { get; set; }
 
     /// <summary>The private key that belongs to the CSR, if you want the API to keep it with the order.</summary>
@@ -31,7 +34,9 @@ public sealed class ConfigureCertificateRequest : BaseRequest<SslOperationResult
     [JsonPropertyName("authenticationType")]
     public ValidationMethod? ValidationMethod { get; set; }
 
-    /// <summary>The approver address for e-mail validation. See <see cref="SslClient.GetApproverEmailsAsync"/>.</summary>
+    /// <summary>
+    /// The approver address for e-mail validation. See <see cref="SslClient.GetApproverEmailsAsync(Guid, CancellationToken)"/>.
+    /// </summary>
     [JsonPropertyName("approverMail")]
     public string? ApproverEmail { get; set; }
 
@@ -59,7 +64,7 @@ public sealed class ConfigureCertificateRequest : BaseRequest<SslOperationResult
     /// <inheritdoc />
     protected internal override void Validate()
     {
-        Require(DomainName, nameof(DomainName));
+        SslValidation.RequireCertificateId(CertificateId);
         Require(Csr, nameof(Csr));
         Require(Contact, nameof(Contact));
         if (ValidationMethod == Ssl.ValidationMethod.Email && string.IsNullOrWhiteSpace(ApproverEmail))

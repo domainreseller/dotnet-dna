@@ -12,6 +12,71 @@ public class AccountClientTests
         });
 
     [Fact]
+    public async Task GetProfileReadsTheResellerProfile()
+    {
+        using var t = new TestClient();
+        t.Handler.Respond(200, """
+            {"id":"00000000-0000-4000-8000-000000000001","resellerAutoId":4821,"name":"example","companyName":"Example Ltd",
+             "resellerGroupName":"Gold","accountCurrency":2,"status":0,"isSubReseller":false,"isBalanceSuspended":true,"isMcpEnabled":true}
+            """);
+
+        var profile = await t.Client.Account.GetProfileAsync();
+
+        Assert.Equal("GET", t.LastRequest.Method);
+        Assert.Equal("resellers/me", t.LastRequest.ApiPath);
+        Assert.Empty(t.LastRequest.QueryParameters);
+        Assert.Null(t.LastRequest.Body);
+
+        Assert.Equal(Guid.Parse(TestClient.ResellerId), profile.Id);
+        Assert.Equal(4821, profile.ResellerAutoId);
+        Assert.Equal("example", profile.Name);
+        Assert.Equal("Example Ltd", profile.CompanyName);
+        Assert.Equal("Gold", profile.ResellerGroupName);
+        Assert.Equal(AccountCurrency.Usd, profile.AccountCurrency);
+        Assert.Equal(ResellerStatus.Active, profile.Status);
+        Assert.False(profile.IsSubReseller);
+        Assert.True(profile.IsBalanceSuspended);
+        Assert.True(profile.IsMcpEnabled);
+    }
+
+    [Theory]
+    [InlineData(1, AccountCurrency.Try)]
+    [InlineData(2, AccountCurrency.Usd)]
+    [InlineData(3, AccountCurrency.Euro)]
+    public async Task ProfileCurrenciesUseTheApiNumbers(int number, AccountCurrency expected)
+    {
+        using var t = new TestClient();
+        t.Handler.Respond(200, "{\"accountCurrency\":" + number + "}");
+
+        Assert.Equal(expected, (await t.Client.Account.GetProfileAsync()).AccountCurrency);
+    }
+
+    [Theory]
+    [InlineData(0, ResellerStatus.Active)]
+    [InlineData(1, ResellerStatus.WaitingForApproval)]
+    [InlineData(2, ResellerStatus.Suspend)]
+    [InlineData(3, ResellerStatus.WaitingForCompletionWizard)]
+    public async Task ProfileStatusesUseTheApiNumbers(int number, ResellerStatus expected)
+    {
+        using var t = new TestClient();
+        t.Handler.Respond(200, "{\"status\":" + number + "}");
+
+        Assert.Equal(expected, (await t.Client.Account.GetProfileAsync()).Status);
+    }
+
+    [Fact]
+    public async Task GetProfileIsAReadAndWorksInReadOnlyMode()
+    {
+        using var t = new TestClient(o => o.ReadOnly = true);
+        t.Handler.Respond(200, "{}");
+
+        var profile = await t.Client.Account.GetProfileAsync();
+
+        Assert.Equal(Guid.Empty, profile.Id);
+        Assert.Null(profile.Name);
+    }
+
+    [Fact]
     public async Task ListTransactionsSendsTheFilters()
     {
         using var t = new TestClient();

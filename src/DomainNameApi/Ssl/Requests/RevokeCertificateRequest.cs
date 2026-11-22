@@ -4,11 +4,11 @@ namespace DomainNameApi.Ssl;
 public sealed class RevokeCertificateRequest : BaseRequest<SslOperationResult>
 {
     /// <summary>Creates the request.</summary>
-    /// <param name="domainName">The domain.</param>
-    public RevokeCertificateRequest(string domainName) => DomainName = domainName;
+    /// <param name="certificateId">The certificate to revoke.</param>
+    public RevokeCertificateRequest(Guid certificateId) => CertificateId = certificateId;
 
-    /// <summary>The domain.</summary>
-    public string DomainName { get; set; }
+    /// <summary>The certificate to revoke.</summary>
+    public Guid CertificateId { get; set; }
 
     /// <inheritdoc />
     public override HttpMethod Method => HttpMethod.Delete;
@@ -20,8 +20,8 @@ public sealed class RevokeCertificateRequest : BaseRequest<SslOperationResult>
     public override OperationSafety Safety => OperationSafety.Destructive;
 
     /// <inheritdoc />
-    protected internal override void AddQueryParameters(QueryParameters query) => query.Add("DomainName", DomainName);
+    protected internal override void AddQueryParameters(QueryParameters query) => query.Add("CertificateId", CertificateId);
 
     /// <inheritdoc />
-    protected internal override void Validate() => Require(DomainName, nameof(DomainName));
+    protected internal override void Validate() => SslValidation.RequireCertificateId(CertificateId);
 }

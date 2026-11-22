@@ -18,7 +18,7 @@
 </p>
 
 [Domain Name API](https://www.domainnameapi.com) 经销商平台的官方 .NET SDK。它用带类型的客户端和模型覆盖了 REST API 的全部
-64 个操作：域名、联系人、DNS、DNSSEC、SSL 证书、主机、订单、产品和你的账户。
+67 个操作：域名、联系人、DNS、DNSSEC、SSL 证书、主机、订单、产品和你的账户。
 
 ```csharp
 using var client = new DomainNameApiClient(resellerId, apiKey, ApiEnvironment.Ote);
@@ -206,6 +206,7 @@ API 的每个领域都有各自的客户端。方法接受简单的参数；如�
 
 ```csharp
 var account = await client.Account.GetAsync();             // ResellerId, ResellerName, TryBalance, UsdBalance
+var profile = await client.Account.GetProfileAsync();      // Name, CompanyName, AccountCurrency, Status, ...
 
 // This month's charges, across all pages
 var request = new ListTransactionsRequest
@@ -383,9 +384,14 @@ await client.Dnssec.DisableAsync("example.com");          // removes every DS re
 
 ### SSL
 
+一个域名可以有多张证书，因此已有的证书通过**证书 ID**（一个 `Guid`）来指定，而不是域名。
+`PurchaseAsync` 和 `RenewAsync` 会返回该 ID：请保存它。`ListAsync` 可以查到你已有证书的 ID。
+
 ```csharp
 // 1. Buy (charges the balance). Product codes come from client.Products.ListSslProductsAsync().
+var approvers = await client.Ssl.GetApproverEmailsAsync("example.com", "PKG-CODE");   // before the purchase
 var order = await client.Ssl.PurchaseAsync("example.com", "PKG-CODE");
+Guid certificateId = order.CertificateId;                  // store it: every later call takes it
 
 // 2. A CSR and private key, if you do not have one
 var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com")
@@ -393,9 +399,8 @@ var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com"
     Country = "TR", State = "Istanbul", Locality = "Istanbul", Organization = "Example Ltd", OrganizationUnit = "IT",
 });
 
-// 3. Configure: CSR, validation method and contact
-var approvers = await client.Ssl.GetApproverEmailsAsync("example.com");
-await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", csr.Csr!, certificateContact)
+// 3. Configure within 15 days: CSR, validation method and contact
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest(certificateId, csr.Csr!, certificateContact)
 {
     ValidationMethod = ValidationMethod.Email,
     ApproverEmail = approvers[0],
@@ -403,16 +408,48 @@ await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", c
 });
 
 // 4. Wait for issuance, then download
-var status = await client.Ssl.RefreshStatusAsync("example.com");
+var status = await client.Ssl.RefreshStatusAsync(certificateId);
 if (status.IsIssued)
 {
-    var content = await client.Ssl.GetContentAsync("example.com");
+    var content = await client.Ssl.GetContentAsync(certificateId);
     File.WriteAllText("fullchain.pem", content.FullChain);
 }
 
-await client.Ssl.ReissueAsync(new ReissueCertificateRequest("example.com") { Csr = newCsr, PrivateKey = newKey });
-await client.Ssl.RevokeAsync("example.com");              // cannot be undone
+var details = await client.Ssl.GetAsync(certificateId);    // subscription, configuration, contacts
+await client.Ssl.ReissueAsync(new ReissueCertificateRequest(certificateId) { Csr = newCsr, PrivateKey = newKey });
+await client.Ssl.RevokeAsync(certificateId);               // cannot be undone
 ```
+
+**列出证书并查找 ID**
+
+```csharp
+var page = await client.Ssl.ListAsync(new ListCertificatesRequest { DomainName = "example.com" });   // newest first
+
+await foreach (var certificate in client.Ssl.ListAllAsync())
+{
+    Console.WriteLine($"{certificate.CertificateId} {certificate.DomainName} {certificate.Status} {certificate.SubscriptionExpiresAt:d}");
+}
+
+// The approver addresses of a certificate you already have
+var approverEmails = await client.Ssl.GetApproverEmailsAsync(certificateId);
+```
+
+**续费**（此操作会扣除你的余额）
+
+```csharp
+// Allowed from 30 days before details.Subscription.ExpiresAt. The renewal is a new certificate with its own ID.
+var renewal = await client.Ssl.RenewAsync(certificateId);
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest(renewal.CertificateId, newCsr, certificateContact)
+{
+    ValidationMethod = ValidationMethod.Email,
+    ApproverEmail = approvers[0],
+    WebServerType = WebServerType.Apache,
+});
+```
+
+购买或续费的证书必须在 15 天内完成配置，否则会被取消。续费时先调用 `RenewAsync`，再用新的 ID 调用 `ConfigureAsync`。
+不要用 `PurchaseAsync` 再买一次：那是按购买价格进行的另一笔购买，旧证书也永远不会被标记为已续费。
+空的证书 ID（`Guid.Empty`）会在发送任何内容之前抛出 `ArgumentException`。
 
 <a id="hosting"></a>
 
@@ -575,7 +612,7 @@ SDK 自行设置的代码：
 |---|---|---|
 | `Read` | 没有副作用，即使 API 使用 POST 或 PUT | 搜索、详情、列表、续费和转移检查、CSR 生成 |
 | `Write` | 免费且可撤销的更改 | DNS 记录、锁定、隐私保护、名称服务器、联系人 |
-| `Billable` | 扣除你的余额 | 注册、续费、转移、恢复、购买 SSL、订购主机 |
+| `Billable` | 扣除你的余额 | 注册、续费、转移、恢复、购买和续费 SSL、订购主机 |
 | `Destructive` | 删除数据或难以撤销 | 删除 DNS 记录、移除 DNSSEC、吊销证书 |
 
 - **只读模式**（`ReadOnly = true` 或 `DNA_READ_ONLY=true`）会在发送之前阻止一切不属于 `Read` 的请求。
@@ -646,7 +683,7 @@ src/DomainNameApi/
 ├── DomainNameApiOptions.cs       Settings and FromEnvironment()
 ├── Core/                         BaseRequest, PagedRequest, QueryParameters, errors, responses, shared enums
 ├── Internal/                     JSON settings, error parsing, the rate-limit pacer
-├── Accounts/   AccountClient     Balances and transactions
+├── Accounts/   AccountClient     Balances, profile and transactions
 ├── Contacts/   ContactsClient    Contact handles
 ├── Domains/    DomainsClient     Domains, plus Forwarding, ChildNameServers and Documents
 ├── Dns/        DnsClient         Zone records

@@ -3,6 +3,9 @@ namespace DomainNameApi.Ssl;
 /// <summary>The current state of a certificate.</summary>
 public sealed record CertificateStatus
 {
+    /// <summary>The ID of the certificate that was checked.</summary>
+    public Guid CertificateId { get; init; }
+
     /// <summary>The domain.</summary>
     public string? DomainName { get; init; }
 

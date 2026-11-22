@@ -20,11 +20,13 @@ namespace DomainNameApi.Tests.Core;
 public class SpecCoverageTests
 {
     private static readonly ContactInfo Contact = new();
+    private static readonly Guid CertificateId = Guid.Parse("7d9f1a52-3c1e-4c9e-9a51-6b8c2f3e4d10");
 
     // One sample of every request, with the safety class the dna CLI assigns to the operation.
     private static readonly (BaseRequest Request, OperationSafety Safety)[] Requests =
     [
         (new GetAccountRequest(), OperationSafety.Read),
+        (new GetProfileRequest(), OperationSafety.Read),
         (new ListTransactionsRequest(), OperationSafety.Read),
 
         (new GetContactRequest("DNA-1"), OperationSafety.Read),
@@ -75,13 +77,15 @@ public class SpecCoverageTests
         (new GenerateCsrRequest("example.com"), OperationSafety.Read),
         (new DecodeCsrRequest("csr"), OperationSafety.Read),
         (new PurchaseCertificateRequest("example.com", "PKG"), OperationSafety.Billable),
-        (new ConfigureCertificateRequest("example.com", "csr", new CertificateContact()), OperationSafety.Write),
-        (new RefreshCertificateStatusRequest("example.com"), OperationSafety.Read),
-        (new GetCertificateRequest("example.com"), OperationSafety.Read),
-        (new GetCertificateContentRequest("example.com"), OperationSafety.Read),
-        (new ReissueCertificateRequest("example.com"), OperationSafety.Write),
-        (new GetApproverEmailsRequest("example.com"), OperationSafety.Read),
-        (new RevokeCertificateRequest("example.com"), OperationSafety.Destructive),
+        (new RenewCertificateRequest(CertificateId), OperationSafety.Billable),
+        (new ListCertificatesRequest(), OperationSafety.Read),
+        (new ConfigureCertificateRequest(CertificateId, "csr", new CertificateContact()), OperationSafety.Write),
+        (new RefreshCertificateStatusRequest(CertificateId), OperationSafety.Read),
+        (new GetCertificateRequest(CertificateId), OperationSafety.Read),
+        (new GetCertificateContentRequest(CertificateId), OperationSafety.Read),
+        (new ReissueCertificateRequest(CertificateId), OperationSafety.Write),
+        (new GetApproverEmailsRequest(CertificateId), OperationSafety.Read),
+        (new RevokeCertificateRequest(CertificateId), OperationSafety.Destructive),
 
         (new ListHostingPackagesRequest(), OperationSafety.Read),
         (new CreateHostingRequest("example.com", "plan"), OperationSafety.Billable),
@@ -97,6 +101,69 @@ public class SpecCoverageTests
         (new ListTldsRequest(), OperationSafety.Read),
         (new ListSslProductsRequest(), OperationSafety.Read),
     ];
+
+    // The certificate requests with every optional value set, so that everything they can send is compared
+    // with the API document. Existing certificates are addressed by ID; a domain name is only sent where the
+    // document still has one (the list filter and the approvers of a domain without a certificate).
+    private static readonly BaseRequest[] CertificateRequests =
+    [
+        new ListCertificatesRequest { DomainName = "example.com", SkipCount = 0, MaxResultCount = 10 },
+        new RenewCertificateRequest(CertificateId),
+        new ConfigureCertificateRequest(CertificateId, "csr", new CertificateContact { FirstName = "Ada" })
+        {
+            PrivateKey = "key",
+            ValidationMethod = ValidationMethod.Email,
+            ApproverEmail = "admin@example.com",
+            WebServerType = WebServerType.Apache,
+            SanList = "www.example.com",
+            WildcardList = "*.example.com",
+        },
+        new RefreshCertificateStatusRequest(CertificateId),
+        new GetCertificateRequest(CertificateId),
+        new GetCertificateContentRequest(CertificateId),
+        new ReissueCertificateRequest(CertificateId) { Csr = "csr", PrivateKey = "key", ApproverEmail = "admin@example.com" },
+        new GetApproverEmailsRequest(CertificateId),
+        new GetApproverEmailsRequest("example.com", "PKG"),
+        new RevokeCertificateRequest(CertificateId),
+    ];
+
+    [Fact]
+    public void CertificateRequestsSendOnlyWhatTheApiDocumentDescribes()
+    {
+        using var document = ReadSpec();
+        var root = document.RootElement;
+
+        foreach (var request in CertificateRequests)
+        {
+            var operation = root.GetProperty("paths").GetProperty("/api/v1/" + request.Path).GetProperty(request.Method.Method.ToLowerInvariant());
+
+            var queryParameters = operation.TryGetProperty("parameters", out var parameters)
+                ? parameters.EnumerateArray().Where(p => p.GetProperty("in").GetString() == "query").ToList()
+                : [];
+            var query = new QueryParameters();
+            request.AddQueryParameters(query);
+            var sentQuery = query.Select(p => p.Key).ToList();
+            Assert.True(!sentQuery.Except(queryParameters.Select(p => p.GetProperty("name").GetString()!)).Any(),
+                request + " sends query parameters the API does not have: " + string.Join(", ", sentQuery));
+            Assert.Empty(queryParameters
+                .Where(p => p.TryGetProperty("required", out var required) && required.GetBoolean())
+                .Select(p => p.GetProperty("name").GetString()!)
+                .Except(sentQuery));
+
+            var body = request.GetBody();
+            if (!operation.TryGetProperty("requestBody", out var requestBody))
+            {
+                Assert.True(body is null, request + " has no body in the API document");
+                continue;
+            }
+            var reference = requestBody.GetProperty("content").EnumerateObject().First().Value.GetProperty("schema").GetProperty("$ref").GetString()!;
+            var schema = root.GetProperty("components").GetProperty("schemas").GetProperty(reference.Substring("#/components/schemas/".Length));
+            var sentBody = JsonSerializer.SerializeToElement(body!, body!.GetType(), DomainNameApi.Internal.Json.Options).Names();
+            Assert.True(!sentBody.Except(schema.GetProperty("properties").Names()).Any(),
+                request + " sends body properties the API does not have: " + string.Join(", ", sentBody));
+            Assert.Empty(schema.GetProperty("required").EnumerateArray().Select(r => r.GetString()!).Except(sentBody));
+        }
+    }
 
     [Fact]
     public void EveryApiOperationHasExactlyOneRequest()
@@ -151,10 +218,12 @@ public class SpecCoverageTests
         return request.Method.Method + " " + path;
     }
 
+    private static JsonDocument ReadSpec() =>
+        JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "testdata", "openapi.json")));
+
     private static Dictionary<string, string> SpecOperations()
     {
-        var file = Path.Combine(AppContext.BaseDirectory, "testdata", "openapi.json");
-        using var document = JsonDocument.Parse(File.ReadAllText(file));
+        using var document = ReadSpec();
         var result = new Dictionary<string, string>();
         foreach (var path in document.RootElement.GetProperty("paths").EnumerateObject())
         {

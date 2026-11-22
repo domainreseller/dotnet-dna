@@ -24,7 +24,7 @@
 <div dir="rtl">
 
 حزمة SDK الرسمية لـ .NET الخاصة بمنصة الموزّعين [Domain Name API](https://www.domainnameapi.com). تغطي جميع عمليات REST API
-البالغ عددها 64 عملية بعملاء ونماذج مكتوبة بأنواع صريحة: النطاقات، وجهات الاتصال، وDNS، وDNSSEC، وشهادات SSL،
+البالغ عددها 67 عملية بعملاء ونماذج مكتوبة بأنواع صريحة: النطاقات، وجهات الاتصال، وDNS، وDNSSEC، وشهادات SSL،
 والاستضافة، والطلبات، والمنتجات، وحسابك.
 
 </div>
@@ -243,6 +243,7 @@ var client = new DomainNameApiClient(httpClient, options);
 
 ```csharp
 var account = await client.Account.GetAsync();             // ResellerId, ResellerName, TryBalance, UsdBalance
+var profile = await client.Account.GetProfileAsync();      // Name, CompanyName, AccountCurrency, Status, ...
 
 // This month's charges, across all pages
 var request = new ListTransactionsRequest
@@ -454,11 +455,17 @@ await client.Dnssec.DisableAsync("example.com");          // removes every DS re
 
 ### SSL
 
+يمكن أن يكون للنطاق الواحد عدة شهادات، ولذلك تُحدَّد الشهادة القائمة عبر **معرّف الشهادة** (من النوع `Guid`)
+لا عبر اسم النطاق. تعيد `PurchaseAsync` و`RenewAsync` هذا المعرّف: احتفظ به. وتعثر `ListAsync` على معرّفات الشهادات
+التي تملكها بالفعل.
+
 </div>
 
 ```csharp
 // 1. Buy (charges the balance). Product codes come from client.Products.ListSslProductsAsync().
+var approvers = await client.Ssl.GetApproverEmailsAsync("example.com", "PKG-CODE");   // before the purchase
 var order = await client.Ssl.PurchaseAsync("example.com", "PKG-CODE");
+Guid certificateId = order.CertificateId;                  // store it: every later call takes it
 
 // 2. A CSR and private key, if you do not have one
 var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com")
@@ -466,9 +473,8 @@ var csr = await client.Ssl.GenerateCsrAsync(new GenerateCsrRequest("example.com"
     Country = "TR", State = "Istanbul", Locality = "Istanbul", Organization = "Example Ltd", OrganizationUnit = "IT",
 });
 
-// 3. Configure: CSR, validation method and contact
-var approvers = await client.Ssl.GetApproverEmailsAsync("example.com");
-await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", csr.Csr!, certificateContact)
+// 3. Configure within 15 days: CSR, validation method and contact
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest(certificateId, csr.Csr!, certificateContact)
 {
     ValidationMethod = ValidationMethod.Email,
     ApproverEmail = approvers[0],
@@ -476,18 +482,58 @@ await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest("example.com", c
 });
 
 // 4. Wait for issuance, then download
-var status = await client.Ssl.RefreshStatusAsync("example.com");
+var status = await client.Ssl.RefreshStatusAsync(certificateId);
 if (status.IsIssued)
 {
-    var content = await client.Ssl.GetContentAsync("example.com");
+    var content = await client.Ssl.GetContentAsync(certificateId);
     File.WriteAllText("fullchain.pem", content.FullChain);
 }
 
-await client.Ssl.ReissueAsync(new ReissueCertificateRequest("example.com") { Csr = newCsr, PrivateKey = newKey });
-await client.Ssl.RevokeAsync("example.com");              // cannot be undone
+var details = await client.Ssl.GetAsync(certificateId);    // subscription, configuration, contacts
+await client.Ssl.ReissueAsync(new ReissueCertificateRequest(certificateId) { Csr = newCsr, PrivateKey = newKey });
+await client.Ssl.RevokeAsync(certificateId);               // cannot be undone
 ```
 
 <div dir="rtl">
+
+**عرض الشهادات والعثور على المعرّف**
+
+</div>
+
+```csharp
+var page = await client.Ssl.ListAsync(new ListCertificatesRequest { DomainName = "example.com" });   // newest first
+
+await foreach (var certificate in client.Ssl.ListAllAsync())
+{
+    Console.WriteLine($"{certificate.CertificateId} {certificate.DomainName} {certificate.Status} {certificate.SubscriptionExpiresAt:d}");
+}
+
+// The approver addresses of a certificate you already have
+var approverEmails = await client.Ssl.GetApproverEmailsAsync(certificateId);
+```
+
+<div dir="rtl">
+
+**التجديد** (يخصم من رصيدك)
+
+</div>
+
+```csharp
+// Allowed from 30 days before details.Subscription.ExpiresAt. The renewal is a new certificate with its own ID.
+var renewal = await client.Ssl.RenewAsync(certificateId);
+await client.Ssl.ConfigureAsync(new ConfigureCertificateRequest(renewal.CertificateId, newCsr, certificateContact)
+{
+    ValidationMethod = ValidationMethod.Email,
+    ApproverEmail = approvers[0],
+    WebServerType = WebServerType.Apache,
+});
+```
+
+<div dir="rtl">
+
+يجب إعداد الشهادة المشتراة أو المجدَّدة خلال 15 يومًا، وإلا أُلغيت. للتجديد استدعِ `RenewAsync` ثم `ConfigureAsync`
+بالمعرّف الجديد. لا تشترِ مجددًا عبر `PurchaseAsync`: فذلك شراء مستقل بسعر الشراء، ولن توسَم الشهادة القديمة بأنها
+مجدَّدة أبدًا. معرّف الشهادة الفارغ (`Guid.Empty`) يُطلق `ArgumentException` قبل إرسال أي شيء.
 
 <a id="hosting"></a>
 
@@ -671,7 +717,7 @@ catch (DomainNameApiException e) when (e.OutcomeUnknown)
 |---|---|---|
 | `Read` | بلا آثار جانبية، حتى لو استخدمت API الأسلوب POST أو PUT | البحث، التفاصيل، القوائم، فحوص التجديد والنقل، إنشاء CSR |
 | `Write` | تغيير مجاني يمكن التراجع عنه | سجلات DNS، القفل، الخصوصية، خوادم الأسماء، جهات الاتصال |
-| `Billable` | يخصم من رصيدك | التسجيل، التجديد، النقل، الاستعادة، شراء SSL، طلب استضافة |
+| `Billable` | يخصم من رصيدك | التسجيل، التجديد، النقل، الاستعادة، شراء SSL وتجديده، طلب استضافة |
 | `Destructive` | يحذف شيئًا أو يصعب التراجع عنه | حذف سجل DNS، إزالة DNSSEC، إلغاء شهادة |
 
 - **وضع القراءة فقط** (‏`ReadOnly = true` أو `DNA_READ_ONLY=true`) يمنع كل ما ليس `Read` قبل إرساله.
@@ -752,7 +798,7 @@ src/DomainNameApi/
 ├── DomainNameApiOptions.cs       Settings and FromEnvironment()
 ├── Core/                         BaseRequest, PagedRequest, QueryParameters, errors, responses, shared enums
 ├── Internal/                     JSON settings, error parsing, the rate-limit pacer
-├── Accounts/   AccountClient     Balances and transactions
+├── Accounts/   AccountClient     Balances, profile and transactions
 ├── Contacts/   ContactsClient    Contact handles
 ├── Domains/    DomainsClient     Domains, plus Forwarding, ChildNameServers and Documents
 ├── Dns/        DnsClient         Zone records
