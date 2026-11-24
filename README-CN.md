@@ -180,6 +180,8 @@ var client = new DomainNameApiClient(httpClient, options);
 | `PaceRequests` | `true` | 控制请求间隔，使其保持在网关的速率限制之内。 |
 | `ReadOnly` | `false` | 在发送之前阻止所有非读取请求。 |
 | `UserAgent` | `DomainNameAPI-DotNet/<version>` | `User-Agent` 请求头。 |
+| `AppName` | `dotnet` | 使用 SDK 的应用，作为 `X-App` 请求头发送（见下文）。 |
+| `AppVersion` | SDK 版本 | 该应用的版本，作为 `X-Version` 请求头发送。 |
 
 `FromEnvironment()` 会读取：
 
@@ -190,6 +192,21 @@ var client = new DomainNameApiClient(httpClient, options);
 | `DNA_TEST_MODE` | `true`、`1`、`on` 或 `yes` 表示选择 OTE。未设置 `DNA_ENV` 时使用。 |
 | `DNA_BASE_URL` | 可选，覆盖基础地址。 |
 | `DNA_READ_ONLY` | `true` 表示开启只读模式。 |
+| `DNA_APP`, `DNA_APP_VERSION` | `AppName` 和 `AppVersion`。 |
+
+每个请求还会带上 `X-App` 和 `X-Version` 请求头，告诉 DomainNameAPI 是哪个集成发送了该请求。默认值是 `dotnet` 和 SDK 版本。如果你基于 SDK 开发面板模块或其他集成，请发送你自己的值：
+
+```csharp
+var client = new DomainNameApiClient(new DomainNameApiOptions
+{
+    ResellerId = resellerId,
+    ApiKey = apiKey,
+    AppName = "WiseCP",      // X-App: wisecp
+    AppVersion = "V2.0.20",  // X-Version: 2.0.20
+});
+```
+
+`AppName` 会转为小写，只保留 `a-z`、`0-9`、`.`、`_` 和 `-`；`AppVersion` 只保留数字和点。名称为空或无效时回退为 `dotnet`，版本为空时回退为 SDK 版本。`client.AppName` 和 `client.AppVersion` 显示实际发送的值。
 
 客户端是线程安全的。每组凭据创建一个客户端，并在应用的整个生命周期内复用。
 

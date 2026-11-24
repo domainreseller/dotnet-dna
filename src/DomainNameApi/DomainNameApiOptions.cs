@@ -56,12 +56,28 @@ public sealed class DomainNameApiOptions
     public string? UserAgent { get; set; }
 
     /// <summary>
+    /// The application that uses the SDK, for example <c>whmcs</c> or <c>my-panel</c>. Sent as the <c>X-App</c> header on
+    /// every request, lowercased and reduced to <c>a-z</c>, <c>0-9</c>, <c>.</c>, <c>_</c> and <c>-</c>.
+    /// Defaults to <c>dotnet</c>; an empty value, or one with none of those characters, also sends <c>dotnet</c>.
+    /// </summary>
+    public string? AppName { get; set; }
+
+    /// <summary>
+    /// The version of the application that uses the SDK, for example <c>2.0.20</c>. Sent as the <c>X-Version</c> header on
+    /// every request with only digits and dots kept (<c>V2.0.20-beta</c> is sent as <c>2.0.20</c>).
+    /// Defaults to the SDK version (<see cref="DomainNameApiClient.Version"/>), which is also sent when this is empty.
+    /// </summary>
+    public string? AppVersion { get; set; }
+
+    /// <summary>
     /// Reads the settings the DomainNameAPI tools share:
     /// <list type="bullet">
     /// <item><c>DNA_RESELLER_ID</c> and <c>DNA_API_KEY</c>: the credentials.</item>
     /// <item><c>DNA_ENV</c> (<c>production</c> or <c>ote</c>) or <c>DNA_TEST_MODE</c> (<c>true</c> for OTE): the environment.</item>
     /// <item><c>DNA_BASE_URL</c>: an optional base address override.</item>
     /// <item><c>DNA_READ_ONLY</c> (<c>true</c>): block everything but reads.</item>
+    /// <item><c>DNA_APP</c> and <c>DNA_APP_VERSION</c>: the <see cref="AppName"/> and <see cref="AppVersion"/> sent as
+    /// <c>X-App</c> and <c>X-Version</c>.</item>
     /// </list>
     /// </summary>
     /// <exception cref="ArgumentException">DNA_ENV or DNA_BASE_URL has a value that cannot be read.</exception>
@@ -95,6 +111,11 @@ public sealed class DomainNameApiOptions
         }
 
         options.ReadOnly = Variable("DNA_READ_ONLY").ToLowerInvariant() is "true" or "1" or "on" or "yes";
+
+        var app = Variable("DNA_APP");
+        options.AppName = app.Length > 0 ? app : null;
+        var appVersion = Variable("DNA_APP_VERSION");
+        options.AppVersion = appVersion.Length > 0 ? appVersion : null;
         return options;
     }
 

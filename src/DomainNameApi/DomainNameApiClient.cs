@@ -109,6 +109,10 @@ public sealed class DomainNameApiClient : IDisposable
         _ownsHttpClient = ownsHttpClient;
         _options = options.Clone();
         _userAgent = string.IsNullOrWhiteSpace(_options.UserAgent) ? DefaultUserAgent : _options.UserAgent!.Trim();
+        var appName = ClientInfo.NormalizeApp(_options.AppName);
+        AppName = appName.Length > 0 ? appName : DefaultAppName;
+        var appVersion = ClientInfo.NormalizeVersion(_options.AppVersion);
+        AppVersion = appVersion.Length > 0 ? appVersion : ClientInfo.NormalizeVersion(Version);
         BaseAddress = _options.ResolveBaseAddress();
         _pacer = new RequestPacer(() => Now(), (wait, ct) => Delay(wait, ct));
 
@@ -125,7 +129,8 @@ public sealed class DomainNameApiClient : IDisposable
 
     /// <summary>
     /// Creates a client from the <c>DNA_RESELLER_ID</c>, <c>DNA_API_KEY</c>, <c>DNA_ENV</c> (or <c>DNA_TEST_MODE</c>),
-    /// <c>DNA_BASE_URL</c> and <c>DNA_READ_ONLY</c> environment variables, the same ones the <c>dna</c> CLI reads.
+    /// <c>DNA_BASE_URL</c> and <c>DNA_READ_ONLY</c> environment variables, the same ones the <c>dna</c> CLI reads,
+    /// plus <c>DNA_APP</c> and <c>DNA_APP_VERSION</c> (see <see cref="DomainNameApiOptions.FromEnvironment"/>).
     /// </summary>
     public static DomainNameApiClient FromEnvironment() => new(DomainNameApiOptions.FromEnvironment());
 
@@ -135,6 +140,21 @@ public sealed class DomainNameApiClient : IDisposable
     /// <summary>The default <c>User-Agent</c> header.</summary>
     public static string DefaultUserAgent { get; } =
         "DomainNameAPI-DotNet/" + Version + " (+https://github.com/domainreseller/dotnet-dna)";
+
+    /// <summary>The <c>X-App</c> header sent when <see cref="DomainNameApiOptions.AppName"/> is not set: <c>dotnet</c>.</summary>
+    public const string DefaultAppName = "dotnet";
+
+    /// <summary>
+    /// The <c>X-App</c> header sent with every request: the normalized <see cref="DomainNameApiOptions.AppName"/>,
+    /// or <see cref="DefaultAppName"/>.
+    /// </summary>
+    public string AppName { get; }
+
+    /// <summary>
+    /// The <c>X-Version</c> header sent with every request: the normalized <see cref="DomainNameApiOptions.AppVersion"/>,
+    /// or the SDK <see cref="Version"/>. Digits and dots only.
+    /// </summary>
+    public string AppVersion { get; }
 
     /// <summary>A copy of the settings this client uses.</summary>
     public DomainNameApiOptions Options => _options.Clone();
@@ -391,6 +411,8 @@ public sealed class DomainNameApiClient : IDisposable
         message.Headers.TryAddWithoutValidation("User-Agent", _userAgent);
         message.Headers.TryAddWithoutValidation("X-API-KEY", _options.ApiKey.Trim());
         message.Headers.TryAddWithoutValidation("__reseller", _options.ResellerId.Trim());
+        message.Headers.TryAddWithoutValidation("X-App", AppName);
+        message.Headers.TryAddWithoutValidation("X-Version", AppVersion);
         if (json is not null)
         {
             message.Content = new StringContent(json, Encoding.UTF8, "application/json");

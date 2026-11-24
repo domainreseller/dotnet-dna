@@ -182,6 +182,8 @@ var client = new DomainNameApiClient(httpClient, options);
 | `PaceRequests` | `true` | Gateway-in sorğu limitlərinin altında qalmaq üçün sorğular arasında fasilə qoyur. |
 | `ReadOnly` | `false` | Oxuma olmayan hər sorğunu göndərilməzdən əvvəl bloklayır. |
 | `UserAgent` | `DomainNameAPI-DotNet/<version>` | `User-Agent` header-i. |
+| `AppName` | `dotnet` | SDK-dan istifadə edən tətbiq; `X-App` header-i kimi göndərilir (aşağıya baxın). |
+| `AppVersion` | SDK versiyası | Həmin tətbiqin versiyası; `X-Version` header-i kimi göndərilir. |
 
 `FromEnvironment()` bunları oxuyur:
 
@@ -192,6 +194,21 @@ var client = new DomainNameApiClient(httpClient, options);
 | `DNA_TEST_MODE` | `true`, `1`, `on` və ya `yes` OTE-ni seçir. `DNA_ENV` təyin edilməyibsə istifadə olunur. |
 | `DNA_BASE_URL` | İstəyə bağlı baza ünvanı əvəzləməsi. |
 | `DNA_READ_ONLY` | `true` yalnız oxuma rejimini aktiv edir. |
+| `DNA_APP`, `DNA_APP_VERSION` | `AppName` və `AppVersion`. |
+
+Hər sorğu həmçinin DomainNameAPI-yə sorğunu hansı inteqrasiyanın göndərdiyini bildirən `X-App` və `X-Version` header-lərini daşıyır. Standart dəyərlər `dotnet` və SDK versiyasıdır. SDK üzərində panel modulu və ya başqa inteqrasiya qurursunuzsa, öz dəyərlərinizi göndərin:
+
+```csharp
+var client = new DomainNameApiClient(new DomainNameApiOptions
+{
+    ResellerId = resellerId,
+    ApiKey = apiKey,
+    AppName = "WiseCP",      // X-App: wisecp
+    AppVersion = "V2.0.20",  // X-Version: 2.0.20
+});
+```
+
+`AppName` kiçik hərflərə çevrilir və yalnız `a-z`, `0-9`, `.`, `_` və `-` simvollarını saxlayır; `AppVersion` yalnız rəqəmləri və nöqtələri saxlayır. Boş və ya etibarsız ad `dotnet`-ə, boş versiya isə SDK versiyasına qayıdır. `client.AppName` və `client.AppVersion` göndərilən dəyərləri göstərir.
 
 Klient thread-safe-dir. Hər giriş məlumatı dəsti üçün bir dənə yaradın və tətbiqin bütün işləmə müddətində təkrar istifadə edin.
 

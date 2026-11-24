@@ -215,6 +215,8 @@ var client = new DomainNameApiClient(httpClient, options);
 | `PaceRequests` | `true` | يوزّع الطلبات زمنيًا لتبقى ضمن حدود معدل الطلبات في البوابة (gateway). |
 | `ReadOnly` | `false` | يمنع كل طلب ليس قراءةً، قبل إرساله. |
 | `UserAgent` | `DomainNameAPI-DotNet/<version>` | ترويسة `User-Agent`. |
+| `AppName` | `dotnet` | التطبيق الذي يستخدم الـ SDK، ويُرسل في ترويسة `X-App` (انظر أدناه). |
+| `AppVersion` | إصدار الـ SDK | إصدار هذا التطبيق، ويُرسل في ترويسة `X-Version`. |
 
 تقرأ `FromEnvironment()` ما يلي:
 
@@ -225,6 +227,25 @@ var client = new DomainNameApiClient(httpClient, options);
 | `DNA_TEST_MODE` | القيم `true` أو `1` أو `on` أو `yes` تختار OTE. تُستخدم عند عدم ضبط `DNA_ENV`. |
 | `DNA_BASE_URL` | تجاوز اختياري للعنوان الأساسي. |
 | `DNA_READ_ONLY` | القيمة `true` تفعّل وضع القراءة فقط. |
+| `DNA_APP`, `DNA_APP_VERSION` | `AppName` و`AppVersion`. |
+
+يحمل كل طلب أيضًا الترويستين `X-App` و`X-Version`، اللتين تُعلمان DomainNameAPI بالتكامل الذي أرسل الطلب. القيمتان الافتراضيتان هما `dotnet` وإصدار الـ SDK. إذا كنت تبني وحدة للوحة تحكم أو تكاملًا آخر فوق الـ SDK، فأرسل قيمك الخاصة:
+
+</div>
+
+```csharp
+var client = new DomainNameApiClient(new DomainNameApiOptions
+{
+    ResellerId = resellerId,
+    ApiKey = apiKey,
+    AppName = "WiseCP",      // X-App: wisecp
+    AppVersion = "V2.0.20",  // X-Version: 2.0.20
+});
+```
+
+<div dir="rtl">
+
+تُحوَّل `AppName` إلى أحرف صغيرة ولا يُبقى فيها إلا `a-z` و`0-9` و`.` و`_` و`-`؛ ولا يُبقى في `AppVersion` إلا الأرقام والنقاط. الاسم الفارغ أو غير الصالح يعود إلى `dotnet`، والإصدار الفارغ يعود إلى إصدار الـ SDK. تعرض `client.AppName` و`client.AppVersion` القيم المُرسلة.
 
 العميل آمن للاستخدام من عدة خيوط (thread-safe). أنشئ عميلًا واحدًا لكل مجموعة بيانات اعتماد، وأعد استخدامه طوال عمر التطبيق.
 
