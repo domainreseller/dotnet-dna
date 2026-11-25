@@ -182,6 +182,8 @@ var client = new DomainNameApiClient(httpClient, options);
 | `PaceRequests` | `true` | İstekleri, geçidin hız sınırlarının altında kalacak şekilde aralıklar. |
 | `ReadOnly` | `false` | Okuma olmayan her isteği, gönderilmeden önce engeller. |
 | `UserAgent` | `DomainNameAPI-DotNet/<version>` | `User-Agent` başlığı. |
+| `AppName` | `dotnet` | SDK'yı kullanan uygulama; `X-App` başlığı olarak gönderilir (aşağıya bakın). |
+| `AppVersion` | SDK sürümü | Bu uygulamanın sürümü; `X-Version` başlığı olarak gönderilir. |
 
 `FromEnvironment()` şunları okur:
 
@@ -192,6 +194,21 @@ var client = new DomainNameApiClient(httpClient, options);
 | `DNA_TEST_MODE` | `true`, `1`, `on` veya `yes` OTE'yi seçer. `DNA_ENV` ayarlı değilse kullanılır. |
 | `DNA_BASE_URL` | İsteğe bağlı temel adres geçersiz kılma. |
 | `DNA_READ_ONLY` | `true`, salt-okunur modu açar. |
+| `DNA_APP`, `DNA_APP_VERSION` | `AppName` ve `AppVersion`. |
+
+Her istek ayrıca, DomainNameAPI'ye isteği hangi entegrasyonun gönderdiğini bildiren `X-App` ve `X-Version` başlıklarını taşır. Varsayılan değerler `dotnet` ve SDK sürümüdür. SDK üzerine bir panel modülü veya başka bir entegrasyon geliştiriyorsanız kendi değerlerinizi gönderin:
+
+```csharp
+var client = new DomainNameApiClient(new DomainNameApiOptions
+{
+    ResellerId = resellerId,
+    ApiKey = apiKey,
+    AppName = "WiseCP",      // X-App: wisecp
+    AppVersion = "V2.0.20",  // X-Version: 2.0.20
+});
+```
+
+`AppName` küçük harfe çevrilir ve yalnızca `a-z`, `0-9`, `.`, `_` ve `-` karakterlerini korur; `AppVersion` yalnızca rakamları ve noktaları korur. Boş veya geçersiz bir ad `dotnet`'e, boş bir sürüm SDK sürümüne geri döner. `client.AppName` ve `client.AppVersion` gönderilen değerleri gösterir.
 
 İstemci thread-safe'tir. Her kimlik bilgisi kümesi için bir tane oluşturun ve uygulamanın ömrü boyunca yeniden kullanın.
 

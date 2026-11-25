@@ -182,6 +182,8 @@ var client = new DomainNameApiClient(httpClient, options);
 | `PaceRequests` | `true` | Espace les requêtes pour rester sous les limites de débit de la passerelle. |
 | `ReadOnly` | `false` | Bloque, avant envoi, toute requête qui n'est pas une lecture. |
 | `UserAgent` | `DomainNameAPI-DotNet/<version>` | L'en-tête `User-Agent`. |
+| `AppName` | `dotnet` | L'application qui utilise le SDK, envoyée dans l'en-tête `X-App` (voir ci-dessous). |
+| `AppVersion` | version du SDK | La version de cette application, envoyée dans l'en-tête `X-Version`. |
 
 `FromEnvironment()` lit :
 
@@ -192,6 +194,21 @@ var client = new DomainNameApiClient(httpClient, options);
 | `DNA_TEST_MODE` | `true`, `1`, `on` ou `yes` sélectionne l'OTE. Utilisée quand `DNA_ENV` n'est pas définie. |
 | `DNA_BASE_URL` | Remplacement facultatif de l'adresse de base. |
 | `DNA_READ_ONLY` | `true` active le mode lecture seule. |
+| `DNA_APP`, `DNA_APP_VERSION` | `AppName` et `AppVersion`. |
+
+Chaque requête porte aussi les en-têtes `X-App` et `X-Version`, qui indiquent à DomainNameAPI quelle intégration l'a envoyée. Par défaut, ils valent `dotnet` et la version du SDK. Si vous construisez un module de panel ou une autre intégration sur le SDK, envoyez vos propres valeurs :
+
+```csharp
+var client = new DomainNameApiClient(new DomainNameApiOptions
+{
+    ResellerId = resellerId,
+    ApiKey = apiKey,
+    AppName = "WiseCP",      // X-App: wisecp
+    AppVersion = "V2.0.20",  // X-Version: 2.0.20
+});
+```
+
+`AppName` est mis en minuscules et ne garde que `a-z`, `0-9`, `.`, `_` et `-` ; `AppVersion` ne garde que les chiffres et les points. Un nom vide ou invalide revient à `dotnet`, une version vide à la version du SDK. `client.AppName` et `client.AppVersion` indiquent les valeurs envoyées.
 
 Le client est thread-safe. Créez-en un par jeu d'identifiants et réutilisez-le pendant toute la durée de vie de l'application.
 

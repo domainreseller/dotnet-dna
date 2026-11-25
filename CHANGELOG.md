@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Every request carries the `X-App` and `X-Version` headers, which tell DomainNameAPI which integration sent it.
+  They default to `dotnet` and the SDK version; set `DomainNameApiOptions.AppName` and `AppVersion` (or the
+  `DNA_APP` and `DNA_APP_VERSION` environment variables) to send your own. The name is lowercased and keeps only
+  `a-z`, `0-9`, `.`, `_` and `-`; the version keeps only digits and dots (`V2.0.20-beta` is sent as `2.0.20`).
+  `DomainNameApiClient.AppName` and `AppVersion` show the values that are sent. `User-Agent` is unchanged.
+
 ## [2.0.0] - 2026-11-22
 
 A new SDK, modelled on the [`dna` CLI](https://github.com/domainreseller/cli) and built from the same API document.
