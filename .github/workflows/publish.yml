@@ -1,0 +1,68 @@
+# Publishes the SDK to NuGet when a GitHub release is published.
+#
+# Uses NuGet trusted publishing (OIDC), so no API key is stored in this repo.
+# One-time setup on nuget.org, signed in as the account that will own the package:
+#   Account -> Trusted Publishing -> Add policy -> GitHub Actions,
+#   owner "domainreseller", repository "dotnet-dna", workflow "publish.yml".
+# Then add a repository secret NUGET_USER with that nuget.org user name
+# (the profile name, not the e-mail address).
+#
+# If you prefer an API key instead, add it as the NUGET_API_KEY secret; it is
+# used when present and the trusted-publishing login is skipped.
+
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Check that the release tag matches the package version
+        if: github.event_name == 'release'
+        run: |
+          v=$(dotnet msbuild src/DomainNameApi/DomainNameApi.csproj -getProperty:Version)
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$tag" != "$v" ]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match the package version $v"
+            exit 1
+          fi
+
+      - name: Restore, build and test
+        run: |
+          dotnet restore DomainNameApi.sln
+          dotnet build DomainNameApi.sln --configuration Release --no-restore
+          dotnet test DomainNameApi.sln --configuration Release --no-build
+
+      - name: Pack
+        run: dotnet pack src/DomainNameApi/DomainNameApi.csproj --configuration Release --no-build --output artifacts
+
+      - name: Log in to NuGet with trusted publishing
+        if: env.NUGET_API_KEY == ''
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to NuGet
+        run: |
+          key="${NUGET_API_KEY:-${{ steps.login.outputs.NUGET_API_KEY }}}"
+          dotnet nuget push "artifacts/*.nupkg" --api-key "$key" \
+            --source https://api.nuget.org/v3/index.json --skip-duplicate
