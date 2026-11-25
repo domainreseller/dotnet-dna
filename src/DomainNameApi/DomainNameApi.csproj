@@ -7,7 +7,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
     <PackageId>DomainNameApi</PackageId>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>DomainNameAPI</Authors>
     <Company>DomainNameAPI</Company>
     <Description>Official .NET SDK for the DomainNameAPI reseller REST API: typed clients and models for domains, contacts, DNS, DNSSEC, SSL certificates, hosting, orders, products and your account. Async, retries and rate-limit pacing built in.</Description>

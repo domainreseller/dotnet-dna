@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-11-26
 
 ### Added
 
@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DNA_APP` and `DNA_APP_VERSION` environment variables) to send your own. The name is lowercased and keeps only
   `a-z`, `0-9`, `.`, `_` and `-`; the version keeps only digits and dots (`V2.0.20-beta` is sent as `2.0.20`).
   `DomainNameApiClient.AppName` and `AppVersion` show the values that are sent. `User-Agent` is unchanged.
+
+### Build
+
+- Releases are published to NuGet by a workflow that runs when a GitHub release is published, once the package
+  owner has set up NuGet trusted publishing (or an API key) for this repository.
 
 ## [2.0.0] - 2026-11-22
 
@@ -128,6 +133,7 @@ A new SDK, modelled on the [`dna` CLI](https://github.com/domainreseller/cli) an
 - xUnit test suite including all 134 php-dna conformance fixtures.
 - README in English, Turkish, German, French, Italian, Dutch, Azerbaijani, Arabic and Simplified Chinese.
 
+[2.1.0]: https://github.com/domainreseller/dotnet-dna/releases/tag/v2.1.0
 [2.0.0]: https://github.com/domainreseller/dotnet-dna/releases/tag/v2.0.0
 [1.0.1]: https://github.com/domainreseller/dotnet-dna/releases/tag/v1.0.1
 [1.0.0]: https://github.com/domainreseller/dotnet-dna/releases/tag/v1.0.0
